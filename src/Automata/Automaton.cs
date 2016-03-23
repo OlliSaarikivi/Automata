@@ -2768,6 +2768,160 @@ namespace Microsoft.Automata
             //res.EliminateDeadStates();
             return res;
         }
+        
+        /// <summary>
+        /// Minimization of SFAs.
+        /// </summary>
+        internal Dictionary<int, Block> BookkeepingMinimize(IBooleanAlgebra<T> solver)
+        {
+            if (IsEmpty)
+                return null;
+
+            if (this == Epsilon)
+                return null;
+
+            if (IsDeterministic != true)
+                throw new AutomataException(AutomataExceptionKind.AutomatonIsNotDeterministic);
+
+            var fa = this.MakeTotal(solver);
+
+            var finalBlock = new Block(fa.GetFinalStates());
+            var nonfinalBlock = new Block(fa.GetNonFinalStates());
+            var Blocks = new Dictionary<int, Block>();
+            foreach (var q in fa.GetFinalStates()) Blocks[q] = finalBlock;
+            foreach (var q in fa.GetNonFinalStates()) Blocks[q] = nonfinalBlock;
+
+            var W = new BlockStack();
+            if (nonfinalBlock.Count < finalBlock.Count)
+                W.Push(nonfinalBlock);
+            else
+                W.Push(finalBlock);
+
+            Func<T, T, T> MkDiff = (x, y) => solver.MkAnd(x, solver.MkNot(y));
+
+            while (!W.IsEmpty)
+            {
+                var R = W.Pop();
+                var Rcopy = new Block(R);                //make a copy of B for iterating over its elemenents
+                var Gamma = new Dictionary<int, T>();     //joined conditions leading to B from states leading to B
+                foreach (var q in Rcopy)
+                    foreach (var move in fa.deltaInv[q]) //moves leading to q
+                        if (Blocks[move.SourceState].Count > 1) //singleton blocks cannot be further split
+                            if (Gamma.ContainsKey(move.SourceState))
+                                Gamma[move.SourceState] = solver.MkOr(Gamma[move.SourceState], move.Label);
+                            else
+                                Gamma[move.SourceState] = move.Label;
+
+                #region apply initial splitting without using guards
+                var relevant = new HashSet<Block>();
+                foreach (var q in Gamma.Keys)
+                    relevant.Add(Blocks[q]);
+
+                foreach (var P in relevant)
+                {
+                    var P1 = new Block(Gamma.Keys, P.Contains); //all q in Gamma.Keys such that P.Contains(q)
+                    if (P1.Count < P.Count)
+                    {
+                        foreach (var p in P1)
+                        {
+                            P.Remove(p);
+                            Blocks[p] = P1;
+                        }
+                        if (W.Contains(P))
+                            W.Push(P1);
+                        else if (P.Count <= P1.Count)
+                            W.Push(P);
+                        else
+                            W.Push(P1);
+                    }
+                }
+                #endregion
+
+                //keep using Bcopy until no more changes occur
+                //effectively, this replaces the loop over characters
+                bool iterate = true;
+                while (iterate)
+                {
+                    iterate = false;
+                    //in each relevant block all states lead to B due to the initial splitting
+                    var relevant2 = new HashSet<Block>();
+                    foreach (var q in Gamma.Keys)
+                        if (Blocks[q].Count > 1)
+                            relevant2.Add(Blocks[q]); //collect the relevant blocks
+
+                    //only relevant blocks are potentially split
+                    foreach (var P in relevant2)
+                    {
+                        var PE = P.GetEnumerator();
+                        PE.MoveNext();
+
+                        var P1 = new Block();
+                        bool splitFound = false;
+
+                        var psi = Gamma[PE.Current];
+                        P1.Add(PE.Current); //C has at least 2 elements
+
+                        #region compute C1 as the new sub-block of C
+                        while (PE.MoveNext())
+                        {
+                            var q = PE.Current;
+                            var phi = Gamma[q];
+                            if (splitFound)
+                            {
+                                var psi_and_phi = solver.MkAnd(psi, phi);
+                                if (solver.IsSatisfiable(psi_and_phi))
+                                    P1.Add(q);
+                            }
+                            else
+                            {
+                                var psi_min_phi = MkDiff(psi, phi);
+                                if (solver.IsSatisfiable(psi_min_phi))
+                                {
+                                    psi = psi_min_phi;
+                                    splitFound = true;
+                                }
+                                else // [[psi]] is subset of [[phi]]
+                                {
+                                    var phi_min_psi = MkDiff(phi, psi);
+                                    if (!solver.IsSatisfiable(phi_min_psi))
+                                        P1.Add(q); //psi and phi are equivalent
+                                    else
+                                    {
+                                        //there is some a: q --a--> B and p --a--> compl(B) for all p in C1
+                                        P1.Clear();
+                                        P1.Add(q);
+                                        psi = phi_min_psi;
+                                        splitFound = true;
+                                    }
+                                }
+                            }
+                        }
+                        #endregion
+
+                        #region split P
+                        if (P1.Count < P.Count)
+                        {
+                            iterate = (iterate || (P.Count > 2)); //otherwise C was split into singletons
+                            foreach (var p in P1)
+                            {
+                                P.Remove(p);
+                                Blocks[p] = P1;
+                            }
+
+                            if (W.Contains(P))
+                                W.Push(P1);
+                            else if (P.Count <= P1.Count)
+                                W.Push(P);
+                            else
+                                W.Push(P1);
+                        }
+                        #endregion
+                    }
+                }
+            }
+
+            return Blocks;
+        }
 
         internal class Block : IEnumerable<int>
         {

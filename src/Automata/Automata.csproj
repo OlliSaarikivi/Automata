@@ -121,6 +121,7 @@
     <Compile Include="STb.cs" />
     <Compile Include="STbComposer.cs" />
     <Compile Include="STbFromRegexBuilder.cs" />
+    <Compile Include="STbMinimizer.cs" />
     <Compile Include="STbSimplifier.cs" />
     <Compile Include="STbSimulator.cs" />
     <Compile Include="STBuilder.cs" />

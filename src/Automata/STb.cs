@@ -1844,6 +1844,12 @@ namespace Microsoft.Automata
             var simplifier = new STbSimplifier<FUNC, TERM, SORT>(this);
             return simplifier.Simplify(bound);
         }
+        
+        public STb<FUNC, TERM, SORT> Minimize()
+        {
+            var minimizer = new STbMinimizer<FUNC, TERM, SORT>(this);
+            return minimizer.Minimize();
+        }
 
         /// <summary>
         /// Eliminate all states that do not lead to some final state.
