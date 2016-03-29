@@ -18,32 +18,15 @@ namespace Microsoft.Automata.CSharpFrontend
 {
     public static class Compiler
     {
-        public static void Compile(string projectFileName, string outputDirectory, bool benchmarkK = false, IEnumerable<string> onlyTypes = null)
+        private static IEnumerable<TransducerCompilation> GetCompilations(Z3Provider ctx, Compilation compilation, IEnumerable<SyntaxTree> trees)
         {
-
-            var workspace = MSBuildWorkspace.Create();
-            var project = workspace.OpenProjectAsync(projectFileName).Result;
-
-            foreach (var document in project.Documents)
-            {
-                if (document.Name.EndsWith(".g.cs"))
-                {
-                    project = project.RemoveDocument(document.Id);
-                }
-            }
-
-            var compilation = project.GetCompilationAsync().Result;
-
-            // All transducers share this context
-            var ctx = new Z3Provider(new Context());
-
             var transducers = new Dictionary<INamedTypeSymbol, TransducerCompilation>();
             var genericTransducerBaseType = compilation.GetTypeByMetadataName(typeof(Transducer<,>).FullName);
             var composedTransducerBaseType = compilation.GetTypeByMetadataName(typeof(Composition<,>).FullName);
             var specialTransducerBaseType = compilation.GetTypeByMetadataName(typeof(SpecialTransducer).FullName);
-            foreach (var document in project.Documents)
+            var charType = compilation.GetTypeByMetadataName(typeof(Int32).FullName);
+            foreach (var tree in trees)
             {
-                var tree = document.GetSyntaxTreeAsync().Result;
                 var model = compilation.GetSemanticModel(tree);
                 var root = tree.GetRoot();
                 // Find all transducer declarations
@@ -100,62 +83,45 @@ namespace Microsoft.Automata.CSharpFrontend
                 composition.SetOperands(inner, outer);
             }
 
-            if (benchmarkK)
+            return transducers.Values;
+        }
+
+        public static IEnumerable<STb<FuncDecl, Expr, Sort>> CSharpToSTb(Z3Provider ctx, string sourceText)
+        {
+            var compilation = CSharpCompilation.Create("ToSTbTemporary");
+
+            compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(IEnumerable<>).Assembly.Location));
+            compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Transducer<,>).Assembly.Location));
+
+            var tree = CSharpSyntaxTree.ParseText(sourceText);
+            compilation = compilation.AddSyntaxTrees(new SyntaxTree[] { tree });
+
+            var transducers = GetCompilations(ctx, compilation, new SyntaxTree[] { tree });
+
+            return from t in transducers
+                   select t.Transducer;
+        }
+
+        public static void Compile(string projectFileName, string outputDirectory, IEnumerable<string> onlyTypes = null)
+        {
+
+            var workspace = MSBuildWorkspace.Create();
+            var project = workspace.OpenProjectAsync(projectFileName).Result;
+
+            foreach (var document in project.Documents)
             {
-                var topLevel = new HashSet<object>();
-                foreach (var composition in transducers.Values.OfType<TransducerComposition>())
+                if (document.Name.EndsWith(".g.cs"))
                 {
-                    topLevel.Add(composition);
+                    project = project.RemoveDocument(document.Id);
                 }
-                foreach (var composition in transducers.Values.OfType<TransducerComposition>())
-                {
-                    topLevel.Remove(composition._inner);
-                    topLevel.Remove(composition._outer);
-                }
-
-                foreach (var composition in topLevel.OfType<TransducerComposition>())
-                {
-                    var declType = composition.DeclarationType;
-                    Console.WriteLine("Benchmarking " + declType.Name);
-
-                    composition.Compose(-1, true);
-                    Console.WriteLine("Min=" + composition.MinimizeRemoved + " Simp=" + composition.SimplifyRemoved);
-
-                    //int K = 1;
-                    //var runtimes = new List<TimeSpan>();
-                    //var simplifyResults = new List<int>();
-                    //var minimizeResults = new List<int>();
-                    //while (K < 100)
-                    //{
-                    //    GC.Collect();
-                    //    var sw = Stopwatch.StartNew();
-                    //    composition.Compose(K, true);
-                    //    sw.Stop();
-                    //    if (sw.Elapsed > TimeSpan.FromMinutes(5))
-                    //    {
-                    //        Console.WriteLine("Timed out on " + declType.Name + " at " + sw.Elapsed);
-                    //        break;
-                    //    }
-
-                    //    runtimes.Add(sw.Elapsed);
-                    //    simplifyResults.Add(composition.SimplifyRemoved);
-                    //    minimizeResults.Add(composition.MinimizeRemoved);
-
-                    //    Console.WriteLine("K=" + K + " Min=" + composition.MinimizeRemoved + " Simp=" + composition.SimplifyRemoved + " Time=" + sw.Elapsed);
-
-                    //    ++K;
-                    //}
-
-                    //for (int i = 0; i < runtimes.Count; ++i)
-                    //{
-                    //    Console.WriteLine("K=" + (i + 1) + " Min=" + minimizeResults[i] + " Simp=" + simplifyResults[i] + " Time=" + runtimes[i]);
-                    //}
-                }
-
-                return;
             }
 
-            IEnumerable<TransducerCompilation> toCompile = transducers.Values;
+            var compilation = project.GetCompilationAsync().Result;
+
+            // All transducers share this context
+            var ctx = new Z3Provider(new Context());
+
+            var toCompile = GetCompilations(ctx, compilation, from d in project.Documents select d.GetSyntaxTreeAsync().Result);
             if (onlyTypes != null)
             {
                 toCompile = from c in toCompile

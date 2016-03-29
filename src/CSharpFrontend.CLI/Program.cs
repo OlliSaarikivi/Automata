@@ -15,7 +15,8 @@ namespace Microsoft.Automata.CSharpFrontend.CLI
 
             if (args.Length < 2)
             {
-                Console.Error.WriteLine("Two arguments are required: a project file and an output directory.");
+                Console.WriteLine("Usage: tool.exe <project.csproj> <output_directory>");
+                return;
             }
 
 #if !DEBUG
@@ -23,9 +24,9 @@ namespace Microsoft.Automata.CSharpFrontend.CLI
             {
 #endif
                 if (args.Length > 2)
-                    Compiler.Compile(args[0], args[1], false, args.Skip(2));
+                    Compiler.Compile(args[0], args[1], onlyTypes: args.Skip(2));
                 else
-                    Compiler.Compile(args[0], args[1], false);
+                    Compiler.Compile(args[0], args[1]);
 #if !DEBUG
             }
             catch (Exception e)
@@ -33,10 +34,9 @@ namespace Microsoft.Automata.CSharpFrontend.CLI
                 Console.Error.WriteLine(e);
             }
 #endif
+
             sw.Stop();
             Console.WriteLine("Process took " + sw.Elapsed.TotalSeconds + " seconds (" + sw.Elapsed + ")");
-
-            Console.WriteLine("Done");
         }
     }
 }
