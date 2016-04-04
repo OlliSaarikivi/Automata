@@ -16,7 +16,7 @@ using System.Linq;
 
 namespace Microsoft.Automata.CSharpFrontend
 {
-    public static class Compiler
+    public static class CSharpParser
     {
         private static IEnumerable<TransducerCompilation> GetCompilations(Z3Provider ctx, Compilation compilation, IEnumerable<SyntaxTree> trees)
         {
@@ -86,14 +86,19 @@ namespace Microsoft.Automata.CSharpFrontend
             return transducers.Values;
         }
 
-        public static IEnumerable<STb<FuncDecl, Expr, Sort>> CSharpToSTb(Z3Provider ctx, string sourceText)
+        public static IEnumerable<STb<FuncDecl, Expr, Sort>> FromString(Z3Provider ctx, string sourceText)
         {
             var compilation = CSharpCompilation.Create("ToSTbTemporary");
 
             compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(IEnumerable<>).Assembly.Location));
             compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Transducer<,>).Assembly.Location));
 
-            var tree = CSharpSyntaxTree.ParseText(sourceText);
+            var patchedText = @"using Microsoft.Automata.CSharpFrontend.Runtime.Transducer;
+using System;
+using System.Collections.Generic;
+" + sourceText;
+
+            var tree = CSharpSyntaxTree.ParseText(patchedText);
             compilation = compilation.AddSyntaxTrees(new SyntaxTree[] { tree });
 
             var transducers = GetCompilations(ctx, compilation, new SyntaxTree[] { tree });
@@ -102,7 +107,7 @@ namespace Microsoft.Automata.CSharpFrontend
                    select t.Transducer;
         }
 
-        public static void Compile(string projectFileName, string outputDirectory, IEnumerable<string> onlyTypes = null)
+        public static void GenerateCodeForProject(string projectFileName, string outputDirectory, IEnumerable<string> onlyTypes = null)
         {
 
             var workspace = MSBuildWorkspace.Create();

@@ -185,8 +185,8 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var ctx = _automataCtx.Z3;
 
-            Expr inputVar = ctx.MkBound(0, ctx.MkBitVecSort(8));
-            Expr registerVar = ctx.MkBound(1, _automataCtx.MkTupleSort());
+            Expr inputVar = _automataCtx.MkVar(0, ctx.MkBitVecSort(8));
+            Expr registerVar = _automataCtx.MkVar(1, _automataCtx.MkTupleSort());
             Sort outputSort = ctx.BoolSort;
             var stb = new STb<FuncDecl, Expr, Sort>(_automataCtx, DeclarationType.Name, inputVar.Sort, outputSort, registerVar.Sort, _automataCtx.MkTuple(), 0);
 
@@ -215,8 +215,8 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var ctx = _automataCtx.Z3;
 
-            Expr inputVar = ctx.MkBound(0, ctx.BoolSort);
-            Expr registerVar = ctx.MkBound(1, _automataCtx.MkTupleSort());
+            Expr inputVar = _automataCtx.MkVar(0, ctx.BoolSort);
+            Expr registerVar = _automataCtx.MkVar(1, _automataCtx.MkTupleSort());
             Sort outputSort = ctx.MkBitVecSort(8);
             var stb = new STb<FuncDecl, Expr, Sort>(_automataCtx, DeclarationType.Name, inputVar.Sort, outputSort, registerVar.Sort, _automataCtx.MkTuple(), 0);
 
@@ -261,8 +261,8 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var ctx = _automataCtx.Z3;
 
-            Expr inputVar = ctx.MkBound(0, ctx.BoolSort);
-            Expr registerVar = ctx.MkBound(1, _automataCtx.MkTupleSort(ctx.MkBitVecSort(8), ctx.MkBitVecSort(32)));
+            Expr inputVar = _automataCtx.MkVar(0, ctx.BoolSort);
+            Expr registerVar = _automataCtx.MkVar(1, _automataCtx.MkTupleSort(ctx.MkBitVecSort(8), ctx.MkBitVecSort(32)));
             Sort outputSort = ctx.MkBitVecSort(8);
             Expr initialRegister = _automataCtx.MkTuple(ctx.MkBV(0, 8), ctx.MkBV(0, 32));
             var stb = new STb<FuncDecl, Expr, Sort>(_automataCtx, DeclarationType.Name, inputVar.Sort, outputSort, registerVar.Sort, initialRegister, 0);
@@ -299,8 +299,8 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var ctx = _automataCtx.Z3;
 
-            Expr inputVar = ctx.MkBound(0, ctx.MkBitVecSort(8));
-            Expr registerVar = ctx.MkBound(1, _automataCtx.MkTupleSort());
+            Expr inputVar = _automataCtx.MkVar(0, ctx.MkBitVecSort(8));
+            Expr registerVar = _automataCtx.MkVar(1, _automataCtx.MkTupleSort());
             Sort outputSort = ctx.BoolSort;
             var stb = new STb<FuncDecl, Expr, Sort>(_automataCtx, DeclarationType.Name, inputVar.Sort, outputSort, registerVar.Sort, _automataCtx.MkTuple(), 0);
 

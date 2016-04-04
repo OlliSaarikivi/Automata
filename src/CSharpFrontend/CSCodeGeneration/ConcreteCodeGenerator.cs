@@ -150,8 +150,8 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             body = body.AddStatements(SH.LocalDeclaration(inputType, currentInput));
 
             var variables = new Dictionary<Expr, ExpressionSyntax>();
-            variables.Add(ctx.MkBound(0, stb.InputSort), SF.IdentifierName(currentInput));
-            var registerVar = ctx.MkBound(1, stb.RegisterSort);
+            variables.Add(stb.Solver.MkVar(0, stb.InputSort), SF.IdentifierName(currentInput));
+            var registerVar = stb.Solver.MkVar(1, stb.RegisterSort);
             variables.Add(registerVar, SF.IdentifierName(register));
 
             int nextTemp = 0;

@@ -25,9 +25,9 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var outputField = resultSort.FieldDecls[1];
             var registerField = resultSort.FieldDecls[2];
 
-            var inputVar = ctx.MkBound(0, stb.InputSort);
-            var registerVar = ctx.MkBound(1, stb.RegisterSort);
-            var computationVar = ctx.MkBound(2, resultSort);
+            var inputVar = stb.Solver.MkVar(0, stb.InputSort);
+            var registerVar = stb.Solver.MkVar(1, stb.RegisterSort);
+            var computationVar = stb.Solver.MkVar(2, resultSort);
 
             var csProjection = csField.Apply(computationVar);
             var outputProjection = outputField.Apply(computationVar);

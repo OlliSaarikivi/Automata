@@ -93,18 +93,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CodeGeneration\CodeGenerationException.cs" />
-    <Compile Include="CodeGeneration\ComputationNode.cs" />
-    <Compile Include="CodeGeneration\ComputationTree.cs" />
-    <Compile Include="CodeGeneration\ComputationTreeTransformer.cs" />
-    <Compile Include="CodeGeneration\ConcreteCodeGenerator.cs" />
-    <Compile Include="CodeGeneration\ConcreteInputCodeGenerator.cs" />
-    <Compile Include="CodeGeneration\ConcreteYieldCodeGenerator.cs" />
-    <Compile Include="CodeGeneration\ParasailExpressionGenerator.cs" />
-    <Compile Include="CodeGeneration\CodeGenerator.cs" />
-    <Compile Include="CodeGeneration\ParasailCodeGenerator.cs" />
-    <Compile Include="CodeGeneration\SyntaxHelpers.cs" />
-    <Compile Include="Compiler.cs" />
+    <Compile Include="CSCodeGeneration\CodeGenerationException.cs" />
+    <Compile Include="CSCodeGeneration\ComputationNode.cs" />
+    <Compile Include="CSCodeGeneration\ComputationTree.cs" />
+    <Compile Include="CSCodeGeneration\ComputationTreeTransformer.cs" />
+    <Compile Include="CSCodeGeneration\ConcreteCodeGenerator.cs" />
+    <Compile Include="CSCodeGeneration\ConcreteInputCodeGenerator.cs" />
+    <Compile Include="CSCodeGeneration\ConcreteYieldCodeGenerator.cs" />
+    <Compile Include="CSCodeGeneration\ParasailExpressionGenerator.cs" />
+    <Compile Include="CSCodeGeneration\CodeGenerator.cs" />
+    <Compile Include="CSCodeGeneration\ParasailCodeGenerator.cs" />
+    <Compile Include="CSCodeGeneration\SyntaxHelpers.cs" />
+    <Compile Include="CSharpParser.cs" />
     <Compile Include="CompileTransducerTask.cs" />
     <Compile Include="SpecialTransducers\XPathMatcherGeneration.cs" />
     <Compile Include="SpecialTransducers\ParsingMatcherGeneration.cs" />

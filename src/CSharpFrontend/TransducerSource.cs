@@ -78,8 +78,8 @@ namespace Microsoft.Automata.CSharpFrontend
                 (DeclarationType.ContainingType == null ? "" : DeclarationType.ContainingType.Name + ".") + DeclarationType.Name;
             Console.WriteLine("Exploring " + name);
 
-            Expr inputVar = Ctx.MkBound(0, Mapper.GetSortMapping(_transducerType.TypeArguments[0]).Sort);
-            Expr registerVar = Ctx.MkBound(1, Mapper.GetSortMapping(DeclarationType).Sort);
+            Expr inputVar = _info.AutomataCtx.MkVar(0, Mapper.GetSortMapping(_transducerType.TypeArguments[0]).Sort);
+            Expr registerVar = _info.AutomataCtx.MkVar(1, Mapper.GetSortMapping(DeclarationType).Sort);
             Mutator register = Mapper.GetSortMapping(DeclarationType).MutatorForValue(registerVar);
 
             var methods = DeclarationType.DeclaringSyntaxReferences.Select(r => r.GetSyntax())

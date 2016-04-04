@@ -39,7 +39,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var compTree = ComputationTreeTransformer.ToComputationTrees(stb, true);
             var silentCompTree = ComputationTreeTransformer.ToComputationTrees(stb, false);
             var stateSort = compTree.InitialState.Sort;
-            var inputVar = ctx.MkBound(0, stb.InputSort);
+            var inputVar = stb.Solver.MkVar(0, stb.InputSort);
 
             // Construct types
             var inputType = ((INamedTypeSymbol)source.InputTypeSymbol).CreateSyntax();
@@ -69,7 +69,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var inputParameter = SF.Identifier("i");
             var innerComputationParameter = SF.Identifier("c");
             eg.Variables[inputVar] = SF.IdentifierName(inputParameter);
-            eg.Variables[ctx.MkBound(2, stateSort)] = SF.IdentifierName(innerComputationParameter);
+            eg.Variables[stb.Solver.MkVar(2, stateSort)] = SF.IdentifierName(innerComputationParameter);
             var moveDecl = SF.MethodDeclaration(outerComputationType, CodeGenerator.CreateName(source.DeclarationType, "MoveComputation"))
                 .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.StaticKeyword)))
                 .WithParameterList(SF.ParameterList(SF.SeparatedList(new[] { SF.Parameter(inputParameter).WithType(inputType), SF.Parameter(innerComputationParameter).WithType(innerComputationType) })))

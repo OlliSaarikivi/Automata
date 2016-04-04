@@ -24,9 +24,9 @@ namespace Microsoft.Automata.CSharpFrontend.CLI
             {
 #endif
                 if (args.Length > 2)
-                    Compiler.Compile(args[0], args[1], onlyTypes: args.Skip(2));
+                    CSharpParser.GenerateCodeForProject(args[0], args[1], onlyTypes: args.Skip(2));
                 else
-                    Compiler.Compile(args[0], args[1]);
+                    CSharpParser.GenerateCodeForProject(args[0], args[1]);
 #if !DEBUG
             }
             catch (Exception e)
