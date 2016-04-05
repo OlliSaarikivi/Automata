@@ -1126,6 +1126,14 @@ namespace Microsoft.Automata.Z3
         }
 
         /// <summary>
+        /// Implies(lhs,rhs) is implication from lhs to rhs.
+        /// </summary>
+        public Expr MkImplies(Expr lhs, Expr rhs)
+        {
+            return z3.MkImplies((BoolExpr)lhs, (BoolExpr)rhs);
+        }
+
+        /// <summary>
         /// Bitwise and of bitvectors
         /// </summary>
         public Expr MkBvAnd(Expr t1, Expr t2)
@@ -3055,6 +3063,11 @@ namespace Microsoft.Automata.Z3
             if (predicate1.Equals(False))
                 return False;
             return z3.MkAnd((BoolExpr)predicate1, (BoolExpr)predicate2);
+        }
+
+        public bool IsValid(Expr expr)
+        {
+            return IsSatisfiable(MkNot(expr));
         }
 
         public bool AreEquivalent(Expr predicate1, Expr predicate2)
