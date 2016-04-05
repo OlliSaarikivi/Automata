@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSharpFrontend.CLI", "src\C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CSharpFrontend.Test", "src\CSharpFrontend.Test\CSharpFrontend.Test.csproj", "{A92ED167-05F5-4953-B7C5-23C571AD46E2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplificationSolver", "src\SimplificationSolver\SimplificationSolver.csproj", "{8D635F6A-1933-475A-8FF9-56851B9E6DDF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -275,6 +277,10 @@ Global
 		{A92ED167-05F5-4953-B7C5-23C571AD46E2}.Release|Win32.Build.0 = Release|Any CPU
 		{A92ED167-05F5-4953-B7C5-23C571AD46E2}.Release|x64.ActiveCfg = Release|Any CPU
 		{A92ED167-05F5-4953-B7C5-23C571AD46E2}.Release|x64.Build.0 = Release|Any CPU
+		{8D635F6A-1933-475A-8FF9-56851B9E6DDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D635F6A-1933-475A-8FF9-56851B9E6DDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D635F6A-1933-475A-8FF9-56851B9E6DDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D635F6A-1933-475A-8FF9-56851B9E6DDF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
