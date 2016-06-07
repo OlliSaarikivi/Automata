@@ -26,11 +26,25 @@ namespace Microsoft.Automata.SimplificationSolver
         {
             if (term.IsApp && term.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_ITE)
             {
+                if (AreEquivalentUnder(ctx, term.Args[1], term.Args[2], path))
+                {
+                    int numAppsLeft = 0;
+                    ExprWalker.PreOrderWalk(ctx, term.Args[1], (e, p) =>
+                    {
+                        ++numAppsLeft;
+                        return true;
+                    });
+                    int numAppsRight = 0;
+                    ExprWalker.PreOrderWalk(ctx, term.Args[2], (e, p) =>
+                    {
+                        ++numAppsRight;
+                        return true;
+                    });
+                    return new RuleResult(numAppsLeft <= numAppsRight ? term.Args[1] : term.Args[2]);
+                }
                 if (AreEquivalentUnder(ctx, term, term.Args[2], path))
                     return new RuleResult(term.Args[2]);
                 if (AreEquivalentUnder(ctx, term, term.Args[1], path))
-                    return new RuleResult(term.Args[1]);
-                if (AreEquivalentUnder(ctx, term.Args[1], term.Args[2], path))
                     return new RuleResult(term.Args[1]);
             }
             return new RuleResult(null);
@@ -40,9 +54,9 @@ namespace Microsoft.Automata.SimplificationSolver
         {
             if (term.IsBool && ctx.IsSatisfiable(path))
             {
-                if (!term.Equals(ctx.True) && ctx.IsValid(term))
+                if (!term.Equals(ctx.True) && ctx.IsValid(ctx.MkImplies(path, term)))
                     return new RuleResult(ctx.True);
-                if (!term.Equals(ctx.False) && ctx.IsValid(ctx.MkNot(term)))
+                if (!term.Equals(ctx.False) && ctx.IsValid(ctx.MkImplies(path, ctx.MkNot(term))))
                     return new RuleResult(ctx.False);
             }
             return new RuleResult(null);

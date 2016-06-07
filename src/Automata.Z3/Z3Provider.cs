@@ -3067,7 +3067,7 @@ namespace Microsoft.Automata.Z3
 
         public bool IsValid(Expr expr)
         {
-            return IsSatisfiable(MkNot(expr));
+            return !IsSatisfiable(MkNot(expr));
         }
 
         public bool AreEquivalent(Expr predicate1, Expr predicate2)

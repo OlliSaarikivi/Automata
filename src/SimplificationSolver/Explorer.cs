@@ -108,9 +108,9 @@ namespace Microsoft.Automata.SimplificationSolver
 
             ExprWalker.PreOrderWalk(ctx, term, (subterm, path) =>
             {
-                if (subterm.IsConst && !subterm.IsNumeral && !subterm.Equals(p.StateParam) && !ordered.Contains(subterm))
+                if (subterm.IsConst && !subterm.Equals(p.StateParam) && !ordered.Contains(subterm))
                 {
-                    ordered.Add(term);
+                    ordered.Add(subterm);
                 }
                 return true;
             });
@@ -127,21 +127,24 @@ namespace Microsoft.Automata.SimplificationSolver
                 ++i;
             }
 
-            return new SubstitutedBody
+            var result = new SubstitutedBody
             {
                 Body = term.Substitute(substs, parameters),
                 Substituted = ordered,
                 Params = returnParams,
             };
+            return result;
         }
 
         Expr CreateSimplifications(Expr term, Program p, Rewriter rewriter)
         {
+            term = term.Simplify();
             var rewriteTargets = new HashSet<Expr> { term };
-            bool somethingSimplified = false;
+            bool somethingSimplified;
             do
             {
-                var assumptions = rewriteTargets.SelectMany(target => Assumer.GetSuggestions(ctx, target, p.StateParam));
+                somethingSimplified = false;
+                var assumptions = rewriteTargets.SelectMany(target => Assumer.GetSuggestions(ctx, target, p.StateParam)).ToArray();
                 foreach (var assumption in assumptions)
                 {
                     Expr newTerm = null;
@@ -153,7 +156,7 @@ namespace Microsoft.Automata.SimplificationSolver
                         totalMatches = 0;
                         foreach (var target in rewriteTargets)
                         {
-                            var newTarget = rewriter.Rewrite(ctx, target, assumption);
+                            var newTarget = rewriter.Rewrite(ctx, target, path);
                             newTargets.Add(newTarget);
                             if (rewriter.RulesMatched != 0)
                             {
@@ -173,11 +176,13 @@ namespace Microsoft.Automata.SimplificationSolver
                         continue;
                     Expr ifFalse = newTerm;
 
-                    term = ctx.MkIte(assumption, ifTrue, ifFalse);
+                    term = rewriter.Rewrite(ctx, ctx.MkIte(assumption, ifTrue, ifFalse));
                     rewriteTargets = newTargets;
                     somethingSimplified = true;
                 }
             } while (somethingSimplified);
+
+
 
             return term;
         }
@@ -243,7 +248,7 @@ namespace Microsoft.Automata.SimplificationSolver
                         if (term.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_ITE)
                         {
                             bool hasStateVar = false;
-                            ExprWalker.PreOrderWalk(ctx, term, (subterm, path) =>
+                            ExprWalker.PreOrderWalk(ctx, term.Args[0], (subterm, path) =>
                             {
                                 if (subterm.Equals(p.StateParam))
                                     hasStateVar = true;
@@ -311,8 +316,13 @@ namespace Microsoft.Automata.SimplificationSolver
             var ret = ShapeFor(rewriter.Rewrite(ctx, p.Body), p, rewriter);
             wave.Add(ret.First);
 
-            for (int i = 0; i < maxDepth; ++i)
+            int depth = 0;
+            while(wave.Count > 0)
             {
+                if (depth == maxDepth)
+                    throw new AutomataException("Maximum depth reached");
+                ++depth;
+
                 var newWave = new List<Shape>();
 
                 foreach (var shape in wave)

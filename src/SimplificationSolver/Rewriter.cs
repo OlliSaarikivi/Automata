@@ -64,13 +64,14 @@ namespace Microsoft.Automata.SimplificationSolver
 
         public Expr Rewrite(Z3Provider ctx, Expr root, Expr initialPath = null)
         {
+            initialPath = initialPath ?? ctx.True;
             ResetStats();
 
             var workStack = new Stack<WorkItem>();
             var appInfoStack = new Stack<AppInfo>();
             var arguments = new Stack<Expr>();
             appInfoStack.Push(new AppInfo(false));
-            workStack.Push(new ExprWorkItem(root, ExpandAll, initialPath ?? ctx.True));
+            workStack.Push(new ExprWorkItem(root, ExpandAll, initialPath));
 
             Action<Expr, Expr> processTerm = (term, path) =>
             {
@@ -164,14 +165,15 @@ namespace Microsoft.Automata.SimplificationSolver
             if (arguments.Count > 1)
                 throw new AutomataException(arguments.Count + " values left on argument stack after rewrite");
 
+            var final = arguments.Peek();
 #if DEBUG
-            if (!ctx.IsValid(ctx.MkEq(root, arguments.Peek())))
+            if (!ctx.IsValid(ctx.MkImplies(initialPath, ctx.MkEq(root, final))))
             {
                 throw new AutomataException("Rewrite did not preserve equivalence");
             }
 #endif
 
-            return arguments.Peek();
+            return final;
         }
 
         private void ResetStats()
