@@ -46,23 +46,44 @@ namespace Microsoft.Automata.SimplificationSolver
             Expr rightSubst = ctx.MkConst("#2", stateParam.Sort);
             var bothSubsts = new Expr[] { leftSubst, rightSubst };
 
+            Func<Expr, Expr, Expr> getAsRuntimeConcrete = (subterm, path) =>
+            {
+                var left = ctx.ApplySubstitution(subterm, stateParam, leftSubst);
+                if (left.Equals(subterm))
+                {
+                    return subterm;
+                }
+                var right = ctx.ApplySubstitution(subterm, stateParam, rightSubst);
+                if (ctx.IsValid(ctx.MkImplies(path, ctx.Z3.MkForall(bothSubsts, ctx.MkEq(left, right)))))
+                {
+                    return SubstituteArbitraryConcretization(ctx, subterm, stateParam);
+                }
+                return null;
+            };
+
             ExprWalker.PreOrderWalk(ctx, term, (subterm, path) =>
             {
                 if (subterm.IsBool)
                 {
-                    var left = ctx.ApplySubstitution(subterm, stateParam, leftSubst);
-                    if (left.Equals(subterm))
+                    var concrete = getAsRuntimeConcrete(subterm, path);
+                    if (concrete != null)
                     {
-                        suggestions.Add(subterm);
-                        return false;
-                    }
-                    var right = ctx.ApplySubstitution(subterm, stateParam, rightSubst);
-                    if (ctx.IsValid(ctx.MkImplies(path, ctx.Z3.MkForall(bothSubsts, ctx.MkEq(left, right)))))
-                    {
-                        suggestions.Add(SubstituteArbitraryConcretization(ctx, subterm, stateParam));
+                        suggestions.Add(concrete);
                         return false;
                     }
                 }
+                //if (subterm.IsBV && subterm.IsApp)
+                //{
+                //    if (subterm.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_BADD)
+                //    {
+                //        var addition = ctx.MkBvAdd(ctx.Z3.MkZeroExt(1, (BitVecExpr)subterm.Args[0]),
+                //            ctx.Z3.MkZeroExt(1, (BitVecExpr)subterm.Args[1]));
+                //        var size = ((BitVecSort)subterm.Sort).Size;
+                //        var highBit = ctx.Z3.MkExtract(size, size, (BitVecExpr)addition);
+                //        var didOverflow = ctx.MkEq(highBit, ctx.Z3.MkBV(1, 1));
+                //        suggestions.Add(didOverflow);
+                //    }
+                //}
                 return true;
             });
             
@@ -70,7 +91,7 @@ namespace Microsoft.Automata.SimplificationSolver
             foreach (Expr candidate in suggestions)
             {
                 if (!filtered.Contains(candidate))
-                    filtered.Add(candidate);
+                    filtered.Add(candidate.Simplify());
             }
 
             return filtered;

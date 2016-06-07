@@ -594,7 +594,7 @@ namespace Microsoft.Automata
 
         public string PrettyPrint(TERM t)
         {
-            return solver.PrettyPrint(t, (x => (x.Equals(inputVar) ? STbInfo.__input_variable : (x.Equals(regVar) ? STbInfo.__register_variable : solver.PrettyPrint(x)))));
+            return solver.PrettyPrint(t, (x => (x.Equals(inputVar) ? STbInfo.__input_variable : (x.Equals(regVar) ? STbInfo.__register_variable : x.ToString()))));
         }
 
         public string PrettyPrint(TERM t, Func<TERM, string> varLookup)

@@ -9,15 +9,15 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Automata.SimplificationSolver
 {
-    static class Lifter
+    public static class Lifter
     {
-        static STb<FuncDecl, Expr, Sort> ToStateComputationSTb(STb<FuncDecl, Expr, Sort> stb)
+        public static Pair<STb<FuncDecl, Expr, Sort>, Expr> ToStateComputationSTb(STb<FuncDecl, Expr, Sort> stb)
         {
             var ctx = stb.Solver as Z3Provider;
             if (ctx == null)
                 throw new AutomataException("Solver must be Z3");
 
-            var csSort = ctx.IntSort;
+            var csSort = ctx.MkBitVecSort(32);
             FuncDecl csAndRegsConstructor;
             FuncDecl[] csAndRegsProjections;
             var csAndRegsSort = ctx.MkTupleSort(stb.Name + "#STATE",
@@ -43,7 +43,7 @@ namespace Microsoft.Automata.SimplificationSolver
                 var baseRule = rule as BaseRule<Expr>;
                 if (baseRule != null)
                 {
-                    return ctx.MkApp(csAndRegsConstructor, ctx.MkInt(baseRule.State), baseRule.Register);
+                    return ctx.MkApp(csAndRegsConstructor, ctx.Z3.MkBV(baseRule.State, 32), baseRule.Register.Substitute(stb.RegVar, registerProjection));
                 }
 
                 throw new AutomataException("Unsupported rule: " + rule);
@@ -55,9 +55,12 @@ namespace Microsoft.Automata.SimplificationSolver
             {
                 var state = states.Pop();
                 var stateTerm = ruleToExpr(stb.GetRuleFrom(state));
-                var condition = ctx.MkEq(csProjection, ctx.MkInt(state));
+                var condition = ctx.MkEq(csProjection, ctx.Z3.MkBV(state, 32));
                 stateTransferTerm = ctx.MkIte(condition, stateTerm, stateTransferTerm);
             }
+
+            stateTransferTerm = stateTransferTerm.Simplify();
+            stateTransferTerm = new Rewriter().Rewrite(ctx, stateTransferTerm);
 
             var p = new Program
             {
@@ -77,7 +80,9 @@ namespace Microsoft.Automata.SimplificationSolver
             foreach (var shape in p.Shapes)
             {
                 var name = stb.Name + "#Args" + i;
-                var constructor = ctx.Z3.MkConstructor(name, "Is" + name, sorts: shape.Parameters.Select(x => x.Sort).ToArray());
+                var constructor = ctx.Z3.MkConstructor(name, "Is" + name, 
+                    Enumerable.Range(0, shape.Parameters.Count).Select(x => name + "_" + x).ToArray(),
+                    shape.Parameters.Select(x => x.Sort).ToArray());
                 constructors.Add(constructor);
                 shapeToState.Add(shape, i);
                 declToShape.Add(shape.Declaration, shape);
@@ -112,7 +117,13 @@ namespace Microsoft.Automata.SimplificationSolver
             foreach (var shape in p.Shapes)
             {
                 var state = shapeToState[shape];
-                scStb.AssignRule(state, templateToRule(shape.CompositionTemplate));
+                var substituted = shape.CompositionTemplate;
+                foreach (var e in shape.Parameters.Zip(shapeArgumentsSort.Accessors[state],
+                    (param, acc) => new { param, proj = ctx.MkApp(acc, scStb.RegVar) }))
+                {
+                    substituted = substituted.Substitute(e.param, e.proj);
+                }
+                scStb.AssignRule(state, templateToRule(substituted));
 
                 var output = shape.Body.Substitute(p.StateParam, batchStateVar);
                 var constructor = constructors[state];
@@ -123,7 +134,7 @@ namespace Microsoft.Automata.SimplificationSolver
                 scStb.AssignFinalRule(state, new BaseRule<Expr>(new Sequence<Expr>(output), scStb.RegVar, 0));
             }
 
-            return scStb;
+            return new Pair<STb<FuncDecl, Expr, Sort>, Expr>(scStb, batchStateVar);
         }
     }
 }
