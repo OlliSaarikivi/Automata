@@ -469,6 +469,46 @@ namespace Microsoft.Automata
                     throw new NotImplementedException(STbRuleKind.Switch.ToString());
             }
         }
+
+        IEnumerable<TERM> GetBaseRuleNonequivalences(IContextCore<TERM> solver, BaseRule<TERM> a, BaseRule<TERM> b)
+        {
+            yield return solver.MkNeq(a.Register, b.Register);
+            for (int i = 0; i < a.Yields.Length; ++i)
+            {
+                yield return solver.MkNeq(a.Yields[i], b.Yields[i]);
+            }
+        }
+
+        public STbRule<TERM> CollapseRedundantITEs(IContextCore<TERM> solver)
+        {
+            switch (this.RuleKind)
+            {
+                case STbRuleKind.Ite:
+                    {
+                        var t = this.TrueCase.CollapseRedundantITEs(solver);
+                        var f = this.FalseCase.CollapseRedundantITEs(solver);
+
+                        if (t.RuleKind == STbRuleKind.Undef && f.RuleKind == STbRuleKind.Undef)
+                            return t;
+                        else if (t.RuleKind == STbRuleKind.Base && f.RuleKind == STbRuleKind.Base)
+                        {
+                            var tb = t as BaseRule<TERM>;
+                            var fb = f as BaseRule<TERM>;
+                            if (tb.State == fb.State && tb.Yields.Length == fb.Yields.Length && !solver.IsSatisfiable(solver.MkOr(GetBaseRuleNonequivalences(solver, tb, fb))))
+                            {
+                                return tb;
+                            }
+                        }
+
+                        if (f == this.FalseCase && t == this.TrueCase)
+                            return this;
+                        else
+                            return new IteRule<TERM>(this.Condition, t, f);
+                    }
+                default:
+                    return this;
+            }
+        }
     }
 
     /// <summary>
