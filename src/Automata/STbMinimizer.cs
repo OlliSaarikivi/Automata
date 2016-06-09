@@ -83,7 +83,7 @@ namespace Microsoft.Automata
 
             }
             //moves.Add(Move<TERM>.Create(errorState, errorState, s.True));
-            var auto = Automaton<TERM>.Create(stb.InitialState, new int[] { acceptingState }, moves);
+            var auto = Automaton<TERM>.Create(stb.Solver, stb.InitialState, new int[] { acceptingState }, moves);
             auto.CheckDeterminism(stb.Solver);
             var blocks = auto.BookkeepingMinimize(stb.Solver);
 

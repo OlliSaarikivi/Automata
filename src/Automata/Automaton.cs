@@ -2803,7 +2803,7 @@ namespace Microsoft.Automata
             if (IsEmpty)
                 return null;
 
-            if (this == Epsilon)
+            if (IsEpsilon)
                 return null;
 
             if (IsDeterministic != true)
