@@ -14,13 +14,18 @@ namespace MinimizationBenchmark
 
         static void Benchmark(string name, string source)
         {
-            var ctx = new Z3Provider();
-            var watch = Stopwatch.StartNew();
-            var transducers = CSharpParser.FromString(ctx, source, false).ToList();
-            var top = transducers[transducers.Count - 1];
-            var min = top.Minimize();
-            Console.WriteLine($"{name}: {watch.Elapsed.TotalSeconds} seconds");
-            Console.WriteLine($"{top.Name}: removed {top.StateCount - min.StateCount} remaining {min.StateCount}");
+            {
+                var ctx = new Z3Provider();
+                var watch = Stopwatch.StartNew();
+                var transducers = CSharpParser.FromString(ctx, source, false).ToList();
+                Console.WriteLine($"{name}, none: {watch.Elapsed.TotalSeconds} seconds");
+            }
+            {
+                var ctx = new Z3Provider();
+                var watch = Stopwatch.StartNew();
+                var transducers = CSharpParser.FromString(ctx, source, true).ToList();
+                Console.WriteLine($"{name}, min: {watch.Elapsed.TotalSeconds} seconds");
+            }
         }
 
         static void Main(string[] args)

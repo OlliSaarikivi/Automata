@@ -80,6 +80,6 @@ partial class UTF16FixSurrogates : Transducer<char, char>
 }";
         public const string Exploding = EnglishHuffmanDecoder + UTF8ToUTF16 + UTF16FixSurrogates + @"
 partial class C1 : Composition<EnglishHuffmanDecoder, UTF8ToUTF16> { }
-partial class C1 : Composition<C1, UTF16FixSurrogates> { }";
+partial class C2 : Composition<C1, UTF16FixSurrogates> { }";
     }
 }
