@@ -76,7 +76,7 @@ namespace Microsoft.Automata.CSharpFrontend
         {
             var name = DeclarationType.ContainingNamespace.Name + "." +
                 (DeclarationType.ContainingType == null ? "" : DeclarationType.ContainingType.Name + ".") + DeclarationType.Name;
-            Console.WriteLine("Exploring " + name);
+            //Console.WriteLine("Exploring " + name);
 
             Expr inputVar = _info.AutomataCtx.MkVar(0, Mapper.GetSortMapping(_transducerType.TypeArguments[0]).Sort);
             Expr registerVar = _info.AutomataCtx.MkVar(1, Mapper.GetSortMapping(DeclarationType).Sort);

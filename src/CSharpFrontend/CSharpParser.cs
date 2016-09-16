@@ -86,7 +86,7 @@ namespace Microsoft.Automata.CSharpFrontend
             return transducers.Values;
         }
 
-        public static IEnumerable<STb<FuncDecl, Expr, Sort>> FromString(Z3Provider ctx, string sourceText)
+        public static IEnumerable<STb<FuncDecl, Expr, Sort>> FromString(Z3Provider ctx, string sourceText, bool useMinimization = true)
         {
             var compilation = CSharpCompilation.Create("ToSTbTemporary");
 
@@ -102,6 +102,11 @@ using System.Collections.Generic;
             compilation = compilation.AddSyntaxTrees(new SyntaxTree[] { tree });
 
             var transducers = GetCompilations(ctx, compilation, new SyntaxTree[] { tree });
+
+            foreach (var transducer in transducers)
+            {
+                transducer.UseMinimization = useMinimization;
+            }
 
             return from t in transducers
                    select t.Transducer;

@@ -22,6 +22,8 @@ namespace Microsoft.Automata.CSharpFrontend
         public abstract ITypeSymbol InputTypeSymbol { get; }
         public abstract ITypeSymbol OutputTypeSymbol { get; }
 
+        public bool UseMinimization { get; set; }
+
         public TransducerCompilation(INamedTypeSymbol declarationType)
         {
             DeclarationType = declarationType;

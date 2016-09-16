@@ -133,7 +133,66 @@ partial class Delta : Transducer<int, int>
         previous = c;
     }
 }";
-        public const string FormatInt32Lines = @"";
+        public const string FormatInt32Lines = @"
+partial class FormatInt32Lines : Transducer<int, char>
+{
+    int NumDigits(long x)
+    {
+        int digits = 10;
+        for (int i = 999999999; i > 0; i /= 10, --digits)
+        {
+            if (x > i)
+            {
+                return digits;
+            }
+        }
+        return digits;
+    }
+
+    int DigitAt(long x, int i)
+    {
+        int power10 = 1;
+        for (int j = 0; j < i; ++j)
+        {
+            power10 *= 10;
+            if (power10 == 1000000000)
+                break;
+        }
+        return (int)((x / power10) % 10);
+    }
+
+    public override IEnumerable<char> Update(int c)
+    {
+        if (c == 0)
+        {
+            yield return '0';
+            yield break;
+        }
+
+        long sign = 1L;
+        if (c < 0)
+        {
+            yield return '-';
+            sign = -1L;
+        }
+
+
+        int digits = NumDigits(sign * c);
+        int divisor = 1;
+        for (int i = 0; i < digits - 1; ++i)
+        {
+            divisor *= 10;
+        }
+        for (int i = 0; i < digits; ++i)
+        {
+            var digit = (c / divisor) % 10;
+            yield return (char)(sign * digit + '0');
+            divisor /= 10;
+        }
+
+        yield return '\n';
+    }
+}";
         public const string UTF16ToUTF8 = @"
 partial class UTF16ToUTF8 : Transducer<char, byte>
 {

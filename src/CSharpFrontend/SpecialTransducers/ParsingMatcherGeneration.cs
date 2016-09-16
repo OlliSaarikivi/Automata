@@ -98,7 +98,7 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var name = DeclarationType.ContainingNamespace.Name + "." +
                 (DeclarationType.ContainingType == null ? "" : DeclarationType.ContainingType.Name + ".") + DeclarationType.Name;
-            Console.WriteLine("Regex " + name);
+            //Console.WriteLine("Regex " + name);
 
             var builder = new STbFromRegexBuilder<FuncDecl, Expr, Sort>(_automataCtx);
             var stb = builder.Mk(_regex, "value", _type);

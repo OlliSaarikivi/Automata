@@ -11,12 +11,16 @@ namespace MinimizationBenchmark
 {
     class Program
     {
+
         static void Benchmark(string name, string source)
         {
             var ctx = new Z3Provider();
             var watch = Stopwatch.StartNew();
-            CSharpParser.FromString(ctx, source).ToList();
+            var transducers = CSharpParser.FromString(ctx, source, false).ToList();
+            var top = transducers[transducers.Count - 1];
+            var min = top.Minimize();
             Console.WriteLine($"{name}: {watch.Elapsed.TotalSeconds} seconds");
+            Console.WriteLine($"{top.Name}: removed {top.StateCount - min.StateCount} remaining {min.StateCount}");
         }
 
         static void Main(string[] args)
@@ -37,6 +41,8 @@ namespace MinimizationBenchmark
             Benchmark(nameof(Transducers.PIR_proteins), Transducers.PIR_proteins);
             Benchmark(nameof(Transducers.DBLP_oldest), Transducers.DBLP_oldest);
             Benchmark(nameof(Transducers.MONDIAL_pop), Transducers.MONDIAL_pop);
+
+            var line = Console.ReadLine();
         }
     }
 }

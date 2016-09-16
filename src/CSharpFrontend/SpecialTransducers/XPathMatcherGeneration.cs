@@ -111,14 +111,14 @@ namespace Microsoft.Automata.CSharpFrontend.SpecialTransducers
         {
             var name = DeclarationType.ContainingNamespace.Name + "." +
                 (DeclarationType.ContainingType == null ? "" : DeclarationType.ContainingType.Name + ".") + DeclarationType.Name;
-            Console.WriteLine("XPath " + name);
+            //Console.WriteLine("XPath " + name);
 
             var parser = new XPathParser<IXPathNode>();
             IXPathNode root;
             try
             {
                 root = parser.Parse(_xpath, new XPathNodeBuilder());
-                Console.WriteLine(root);
+                //Console.WriteLine(root);
             }
             catch (XPathParserException e)
             {

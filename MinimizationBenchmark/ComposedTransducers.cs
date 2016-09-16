@@ -28,7 +28,7 @@ partial class UTF8Col3Int : Composition<UTF8ToUTF16, Col3Int> { }
 partial class UTF8MaxCol3Int : Composition<UTF8Col3Int, Maximum> { }
 partial class UTF8MaxCol3IntFormat : Composition<UTF8MaxCol3Int, FormatInt32Lines> { }
 partial class UTF8MaxCol3IntB64 : Composition<UTF8MaxCol3IntFormat, UTF16ToUTF8> { }";
-        public const string Base64_avg = Base64Encoder + WindowedAverage10 + B64ToInts + @"
+        public const string Base64_avg = Int32ToBytes + Base64Encoder + WindowedAverage10 + B64ToInts + @"
 partial class IntsToB64 : Composition<Int32ToBytes, Base64Encoder> { }
 partial class WindowedAverageB64 : Composition<WindowedAverage10, IntsToB64> { }
 partial class B64ToWindowedAverageToB64 : Composition<B64ToInts, WindowedAverageB64> { }";
@@ -78,7 +78,7 @@ partial class SBOGrossReceipts : SpecialTransducer { }
 partial class CSV7a : Composition<UTF8ToUTF16, SBOGrossReceipts> { }
 partial class CSV7ab : Composition<CSV7a, Minimum> { }
 partial class CSV7abc : Composition<CSV7ab, Int32ToBytes> { }";
-        public const string TPC_DI_SQL = UTF8ToUTF16 + Int32ToBytes + SQLInsertInt32 + @"
+        public const string TPC_DI_SQL = UTF8ToUTF16 + Int32ToBytes + SQLInsertInt32 + UTF16ToUTF8 + @"
 [XPathMatcher(""/TPCDI:Actions/TPCDI:Action/Customer/Account/CA_B_ID"", ""int"")]
 partial class TPCDICustomerIds : SpecialTransducer { }
 partial class XML1a : Composition<UTF8ToUTF16, TPCDICustomerIds> { }
