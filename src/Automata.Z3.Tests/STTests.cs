@@ -863,5 +863,43 @@ namespace Automata.Z3.Tests
 
         }
 
+        [TestMethod]
+        public void TestSTbQuasiDeterminization()
+        {
+            var ctx = new Z3Provider(BitWidth.BV16);
+            var sf = new STb<FuncDecl, Expr, Sort>(ctx, "Smiliyfy", ctx.CharacterSort, ctx.CharacterSort, ctx.UnitSort,
+                ctx.UnitConst, 0);
+            sf.AssignRule(0, new IteRule<Expr>(ctx.MkCharConstraint(':'),
+                new BaseRule<Expr>(Sequence<Expr>.Empty, ctx.UnitConst, 1),
+                new BaseRule<Expr>(new Sequence<Expr>(sf.InputVar), ctx.UnitConst, 0)));
+            sf.AssignFinalRule(0, new BaseRule<Expr>(Sequence<Expr>.Empty, ctx.UnitConst, 0));
+            sf.AssignRule(1, new IteRule<Expr>(ctx.MkCharConstraint(':'),
+                new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort)), ctx.UnitConst, 1),
+                new IteRule<Expr>(ctx.MkCharConstraint('-'),
+                    new BaseRule<Expr>(Sequence<Expr>.Empty, ctx.UnitConst, 2),
+                    new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort), sf.InputVar), ctx.UnitConst, 0))));
+            sf.AssignFinalRule(1, new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort)), ctx.UnitConst, 0));
+            sf.AssignRule(2, new IteRule<Expr>(ctx.MkCharConstraint(':'),
+                new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort), ctx.MkNumeral('-', ctx.CharacterSort)), ctx.UnitConst, 1),
+                new IteRule<Expr>(ctx.MkCharConstraint(')'),
+                    new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral('\u263A', ctx.CharacterSort)), ctx.UnitConst, 0),
+                    new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort), ctx.MkNumeral('-', ctx.CharacterSort), sf.InputVar), ctx.UnitConst, 0))));
+            sf.AssignFinalRule(2, new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort), ctx.MkNumeral('-', ctx.CharacterSort)), ctx.UnitConst, 0));
+
+            var usf = new STb<FuncDecl, Expr, Sort>(ctx, "Unsmilify", ctx.CharacterSort, ctx.CharacterSort, ctx.UnitSort,
+                ctx.UnitConst, 0);
+            usf.AssignRule(0, new IteRule<Expr>(ctx.MkCharConstraint('\u263A'),
+                new BaseRule<Expr>(new Sequence<Expr>(ctx.MkNumeral(':', ctx.CharacterSort), ctx.MkNumeral('-', ctx.CharacterSort), ctx.MkNumeral(')', ctx.CharacterSort)), ctx.UnitConst, 0),
+                new BaseRule<Expr>(new Sequence<Expr>(usf.InputVar), ctx.UnitConst, 0)));
+            usf.AssignFinalRule(0, new BaseRule<Expr>(Sequence<Expr>.Empty, ctx.UnitConst, 0));
+            var su = sf.Compose(usf);
+            //su.ShowGraph();
+            var suHat = QuasiDeterminizer.QuasiDeterminizeSTb(su);
+            //suHat.ShowGraph();
+            var suMin = su.Minimize();
+            suMin.ShowGraph();
+            var suHatMin = suHat.Minimize();
+            suHatMin.ShowGraph();
+        }
     }
 }
