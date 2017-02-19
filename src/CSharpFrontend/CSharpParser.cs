@@ -147,7 +147,7 @@ using System.Collections.Generic;
                     (declType.ContainingType == null ? "" : declType.ContainingType.Name + ".") + declType.Name + ".g.cs";
                 Console.WriteLine("Generating " + fileName);
 
-                var codeTree = codeGenerator.Generate(source, stb);
+                var codeTree = codeGenerator.Generate(source);
                 codeTree = codeTree.WithFilePath(Path.Combine(outputDirectory, fileName));
                 using (var writer = new StreamWriter(new FileStream(codeTree.FilePath, FileMode.Create)))
                 {

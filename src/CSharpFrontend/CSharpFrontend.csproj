@@ -97,6 +97,7 @@
     <Compile Include="CSCodeGeneration\ComputationNode.cs" />
     <Compile Include="CSCodeGeneration\ComputationTree.cs" />
     <Compile Include="CSCodeGeneration\ComputationTreeTransformer.cs" />
+    <Compile Include="CSCodeGeneration\CallFusionCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\ConcreteCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\ConcreteInputCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\ConcreteYieldCodeGenerator.cs" />

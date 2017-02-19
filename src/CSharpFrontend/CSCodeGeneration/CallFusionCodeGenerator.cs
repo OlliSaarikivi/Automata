@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Z3;
 using System;
 using System.IO;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,19 +17,168 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
     using SH = SyntaxHelpers;
 
-    class ConcreteCodeGenerator
+    class CallFusionCodeGenerator
     {
+        const int BufferSize = 16384;
+
         Compilation _compilation;
+        INamedTypeSymbol _stream;
 
         ExpressionSyntax _trueSyntax = SF.LiteralExpression(SyntaxKind.TrueLiteralExpression, SF.Token(SyntaxKind.TrueKeyword));
         ExpressionSyntax _falseSyntax = SF.LiteralExpression(SyntaxKind.FalseLiteralExpression, SF.Token(SyntaxKind.FalseKeyword));
 
-        public ConcreteCodeGenerator(Compilation compilation)
+        SyntaxToken outputParameter = SF.Identifier("output");
+        SyntaxToken outputBuffer = SF.Identifier("oBuf");
+        SyntaxToken outputIndex = SF.Identifier("oIndex");
+
+        public CallFusionCodeGenerator(Compilation compilation)
         {
             _compilation = compilation;
+            _stream = compilation.GetTypeByMetadataName(typeof(Stream).FullName);
         }
 
-        public ClassDeclarationSyntax Generate(TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, ClassDeclarationSyntax classDecl)
+        private void GetStages(TransducerCompilation transducer, List<TransducerCompilation> stages)
+        {
+            var composition = transducer as TransducerComposition;
+            if (composition != null)
+            {
+                GetStages(composition._inner, stages);
+                GetStages(composition._outer, stages);
+            } else
+            {
+                stages.Add(composition);
+            }
+        }
+
+        public IEnumerable<MemberDeclarationSyntax> GenerateMembers(TransducerCompilation pipeline, string namePostfix)
+        {
+            SyntaxToken inputParameter = SF.Identifier("input");
+            SyntaxToken inputBuffer = SF.Identifier("iBuf");
+            SyntaxToken inputIndex = SF.Identifier("iIndex");
+            SyntaxToken read = SF.Identifier("read");
+
+            SyntaxToken pipelineVar = SF.Identifier("pipeline");
+
+            var stages = new List<TransducerCompilation>();
+            GetStages(pipeline, stages);
+            stages.Reverse();
+
+            var implClassDecl = SF.ClassDeclaration("CallFusionTransducerImpl" + namePostfix)
+                .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PrivateKeyword)));
+
+            SyntaxToken sinkInputParameter = SF.Identifier("i");
+            var sinkType = ((INamedTypeSymbol)stages[0].OutputTypeSymbol).CreateSyntax();
+            var sinkClassDecl = SF.ClassDeclaration("Sink");
+            var bufferType = SF.ArrayType(SH.PredefinedType(SyntaxKind.ByteKeyword),
+                SF.SingletonList(SF.ArrayRankSpecifier(SF.SingletonSeparatedList((ExpressionSyntax)SH.Literal(BufferSize)))));
+            sinkClassDecl = sinkClassDecl.AddMembers(
+                SF.FieldDeclaration(SF.VariableDeclaration(_stream.CreateSyntax()).AddVariables(SF.VariableDeclarator(outputParameter))),
+                SF.FieldDeclaration(SF.VariableDeclaration(bufferType).AddVariables(SF.VariableDeclarator(outputBuffer)
+                    .WithInitializer(SF.EqualsValueClause(SF.ArrayCreationExpression(bufferType))))),
+                SF.FieldDeclaration(SF.VariableDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword)).AddVariables(SF.VariableDeclarator(outputIndex)
+                    .WithInitializer(SF.EqualsValueClause(SH.Literal(0))))),
+
+                SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Update")
+                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)))
+                    .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(sinkInputParameter)
+                        .WithType(sinkType))))
+                    .WithBody(SF.Block(GetYields(new ExpressionSyntax[] { SF.IdentifierName(sinkInputParameter) }, 1))),
+                SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Finish")
+                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)))
+                    .WithBody(SF.Block(
+                        SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanExpression, SF.IdentifierName(outputIndex), SH.Literal(0)),
+                                    SF.ExpressionStatement(SF.IdentifierName(outputParameter).Dot("Write").Invoke(SF.IdentifierName(outputBuffer), SH.Literal(0), SF.IdentifierName(outputIndex)))),
+                        SF.ReturnStatement()
+                        )),
+                SF.ConstructorDeclaration("Sink")
+                    .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(outputParameter).WithType(_stream.CreateSyntax()))))
+                    .WithBody(SF.Block(
+                        SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
+                            SF.IdentifierName(SF.Token(SyntaxKind.ThisKeyword)).Dot(SF.IdentifierName(outputParameter)),
+                            SF.IdentifierName(outputParameter)))
+                        )));
+            implClassDecl = implClassDecl.AddMembers(sinkClassDecl);
+
+            TypeSyntax nextStageType = SF.ParseTypeName("Microsoft.Automata.CSharpFrontend.Runtime.Transducer");
+            ExpressionSyntax newExpression = SF.ObjectCreationExpression(nextStageType)
+                .WithArgumentList(SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(outputParameter)))));
+            foreach (var source in stages)
+            {
+                var stb = source.Transducer;
+                
+                var classDecl = source.DeclarationType.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<ClassDeclarationSyntax>().FirstOrDefault()
+                    .WithLeadingTrivia().WithTrailingTrivia() // Strip any trivia
+                    .WithMembers(SF.List<MemberDeclarationSyntax>())
+                    .WithAttributeLists(SF.List<AttributeListSyntax>())
+                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PrivateKeyword)));
+                if (classDecl == null)
+                {
+                    throw new Exception("Class declaration for " + source.DeclarationType + " not found");
+                }
+
+                implClassDecl = implClassDecl.AddMembers(Generate(source, stb, classDecl, nextStageType));
+
+                nextStageType = SF.IdentifierName(classDecl.Identifier);
+                newExpression = SF.ObjectCreationExpression(SF.IdentifierName(implClassDecl.Identifier).Qualified(SF.IdentifierName(classDecl.Identifier)))
+                    .WithArgumentList(SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(newExpression))));
+            }
+
+            var body = SF.Block(
+                SH.LocalDeclaration(SF.IdentifierName("var"), inputBuffer, SF.ArrayCreationExpression(bufferType)),
+                SH.LocalDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword), inputIndex, SH.Literal(0)),
+                SH.LocalDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword), read, SH.Literal(0)),
+                SH.LocalDeclaration(SF.IdentifierName("var"), pipelineVar, newExpression),
+                SF.ForStatement(SF.Block(
+                    SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanOrEqualExpression,
+                        SF.PrefixUnaryExpression(SyntaxKind.PreIncrementExpression, SF.IdentifierName(inputIndex)), SF.IdentifierName(read)), SF.Block(
+                            SH.Assignment(SF.IdentifierName(read), SF.IdentifierName(inputParameter).Dot("Read").Invoke(SF.IdentifierName(inputBuffer), SH.Literal(0), SF.IdentifierName(inputBuffer).Dot("Length"))),
+                            SF.IfStatement(SF.BinaryExpression(SyntaxKind.EqualsExpression, SF.IdentifierName(read), SH.Literal(0)), SF.Block(
+                                SF.ExpressionStatement(SF.InvocationExpression(SF.IdentifierName(pipelineVar).Dot("Finish"))),
+                                SF.ReturnStatement())),
+                            SH.Assignment(SF.IdentifierName(inputIndex), SH.Literal(0)))),
+                    SF.ExpressionStatement(SF.InvocationExpression(SF.IdentifierName(pipelineVar).Dot("Update")).WithArgumentList(SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(
+                        SF.ElementAccessExpression(SF.IdentifierName(inputBuffer),
+                            SF.BracketedArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(inputIndex))))))))))
+                )));
+
+            yield return SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Transduce" + namePostfix)
+                .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword)))
+                .WithParameterList(SF.ParameterList(SF.SeparatedList(new ParameterSyntax[] {
+                        SF.Parameter(inputParameter).WithType(_stream.CreateSyntax()),
+                        SF.Parameter(outputParameter).WithType(_stream.CreateSyntax()),
+                    })))
+                .WithBody(body);
+
+            yield return implClassDecl;
+        }
+
+        private IEnumerable<StatementSyntax> GetYields(IEnumerable<ExpressionSyntax> yields, int numYields)
+        {
+            if (numYields == 0)
+            {
+                yield break;
+            }
+            if (numYields > BufferSize)
+            {
+                throw new NotImplementedException();
+            }
+            yield return SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanExpression, SF.IdentifierName(outputIndex), SH.Literal(BufferSize - numYields)),
+                SF.Block(
+                    SF.ExpressionStatement(SF.IdentifierName(outputParameter).Dot("Write").Invoke(SF.IdentifierName(outputBuffer), SH.Literal(0), SF.IdentifierName(outputIndex))),
+                    SH.Assignment(SF.IdentifierName(outputIndex), SH.Literal(0))));
+            int index = 0;
+            foreach (var yieldSyntax in yields)
+            {
+                yield return SH.Assignment(SF.ElementAccessExpression(SF.IdentifierName(outputBuffer), SF.BracketedArgumentList(SF.SingletonSeparatedList(SF.Argument(
+                        SF.BinaryExpression(SyntaxKind.AddExpression, SF.IdentifierName(outputIndex), SH.Literal(index)))))),
+                    yieldSyntax);
+                ++index;
+            }
+            yield return SH.Assignment(SF.IdentifierName(outputIndex), SH.Literal(numYields), SyntaxKind.AddAssignmentExpression);
+        }
+
+
+        private ClassDeclarationSyntax Generate(TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, ClassDeclarationSyntax classDecl, TypeSyntax nextStageType)
         {
             bool commonExpressionsInTemporaries = true;
 
@@ -40,34 +190,14 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var inputType = ((INamedTypeSymbol)source.InputTypeSymbol).CreateSyntax();
             var outputType = ((INamedTypeSymbol)source.OutputTypeSymbol).CreateSyntax();
 
-            classDecl = DoGenerate("", source, stb, classDecl, knownFunctions,
-                new IEnumerableInputCodeGenerator(_compilation, inputType),
-                new IEnumerableYieldCodeGenerator(_compilation, outputType),
-                commonExpressionsInTemporaries);
-
-            if ((source.InputTypeSymbol.SpecialType == SpecialType.System_Byte || source.InputTypeSymbol.SpecialType == SpecialType.System_Boolean) &&
-                source.OutputTypeSymbol.SpecialType == SpecialType.System_Byte)
-            {
-                ConcreteInputCodeGenerator streamInputGen = new StreamInputCodeGenerator(_compilation);
-                ConcreteInputCodeGenerator arrayInputGen = new ArrayInputCodeGenerator(SH.PredefinedType(SyntaxKind.ByteKeyword));
-                var streamYieldGen = new StreamYieldCodeGenerator(_compilation);
-
-                if (source.InputTypeSymbol.SpecialType == SpecialType.System_Boolean)
-                {
-                    streamInputGen = new BitwiseInputWrapperGenerator(streamInputGen);
-                    arrayInputGen = new BitwiseInputWrapperGenerator(arrayInputGen);
-                }
-
-                classDecl = DoGenerate("FromStreamToStream", source, stb, classDecl, knownFunctions, streamInputGen, streamYieldGen, commonExpressionsInTemporaries);
-                classDecl = DoGenerate("FromArrayToStream", source, stb, classDecl, knownFunctions, arrayInputGen, streamYieldGen, commonExpressionsInTemporaries);
-
-                classDecl = classDecl.AddMembers(new CallFusionCodeGenerator(_compilation).Generate(source, "CallFusedFromStreamToStream").ToArray());
-            }
+            classDecl = DoGenerate("", source, stb, classDecl, knownFunctions, commonExpressionsInTemporaries, nextStageType);
 
             return classDecl;
         }
 
-        public ClassDeclarationSyntax GenerateBackgroundFunctions(Context ctx, TransducerCompilation source, ClassDeclarationSyntax classDecl, out Dictionary<FuncDecl, SyntaxToken> knownFunctions, bool commonExpressionsInTemporaries)
+        private ClassDeclarationSyntax GenerateBackgroundFunctions(
+            Context ctx, TransducerCompilation source, ClassDeclarationSyntax classDecl,
+            out Dictionary<FuncDecl, SyntaxToken> knownFunctions, bool commonExpressionsInTemporaries)
         {
             var members = new List<MemberDeclarationSyntax>();
             Action<MemberDeclarationSyntax> addMember = memberSyntax => members.Add(memberSyntax);
@@ -118,9 +248,12 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             return classDecl.AddMembers(members.ToArray());
         }
 
-        public ClassDeclarationSyntax DoGenerate(string namePostfix, TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, ClassDeclarationSyntax classDecl,
-            Dictionary<FuncDecl, SyntaxToken> knownFunctions, ConcreteInputCodeGenerator inputGen, ConcreteYieldCodeGenerator yieldGen, bool useCommonSubexpressionElimination)
+        private ClassDeclarationSyntax DoGenerate(
+            string namePostfix, TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, ClassDeclarationSyntax classDecl,
+            Dictionary<FuncDecl, SyntaxToken> knownFunctions, bool useCommonSubexpressionElimination, TypeSyntax nextStageType)
         {
+            SyntaxToken inputParameter = SF.Identifier("i");
+
             var members = new List<MemberDeclarationSyntax>();
             Action<MemberDeclarationSyntax> addMember = memberSyntax => members.Add(memberSyntax);
             var datatypeSyntaxes = new Dictionary<Sort, TypeSyntax>();
@@ -132,32 +265,37 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var outputType = ((INamedTypeSymbol)source.OutputTypeSymbol).CreateSyntax();
             var stateType = GetTypeForSort(stb.RegisterSort, source, addMember, datatypeSyntaxes);
 
-            MethodDeclarationSyntax transduceDecl;
+            INamedTypeSymbol action0 = _compilation.GetTypeByMetadataName(typeof(Action).FullName);
+            INamedTypeSymbol action1 = _compilation.GetTypeByMetadataName(typeof(Action<>).FullName);
 
-            transduceDecl = SF.MethodDeclaration(yieldGen.GetReturnType(), CodeGenerator.CreateName(source.DeclarationType, "Transduce" + namePostfix))
-                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword)))
-                    .WithParameterList(SF.ParameterList(SF.SeparatedList(inputGen.GetParameters().Concat(yieldGen.GetParameters()))));
+            var updateAction = SF.Identifier("u");
+            members.Add(SF.FieldDeclaration(SF.VariableDeclaration(action1.CreateGenericSyntax(inputType), SF.SingletonSeparatedList(
+                SF.VariableDeclarator(updateAction)
+            ))));
 
-            var body = SF.Block();
-
-            body = body.AddStatements(inputGen.GetInitialization().ToArray());
-            body = body.AddStatements(yieldGen.GetInitialization().ToArray());
+            var finishAction = SF.Identifier("f");
+            members.Add(SF.FieldDeclaration(SF.VariableDeclaration(action0.CreateSyntax(), SF.SingletonSeparatedList(
+                SF.VariableDeclarator(finishAction)
+            ))));
 
             var register = SF.Identifier("s");
-            body = body.AddStatements(SH.LocalDeclaration(stateType, register,
-                GenerateConcreteExpression(ctx, stb.InitialRegister, new Dictionary<Expr, ExpressionSyntax>(), source, addMember, datatypeSyntaxes, knownFunctions,
-                    (term, syntax) => syntax, new Dictionary<Expr, ExpressionSyntax>())));
+            members.Add(SF.FieldDeclaration(SF.VariableDeclaration(stateType, SF.SingletonSeparatedList(
+                SF.VariableDeclarator(register).WithInitializer(SF.EqualsValueClause(
+                    GenerateConcreteExpression(ctx, stb.InitialRegister, new Dictionary<Expr, ExpressionSyntax>(), source, addMember, datatypeSyntaxes, knownFunctions,
+                    (term, syntax) => syntax, new Dictionary<Expr, ExpressionSyntax>())))
+            ))));
 
-            var currentInput = SF.Identifier("i");
-            body = body.AddStatements(SH.LocalDeclaration(inputType, currentInput));
+            var nextStage = SF.Identifier("n");
+            members.Add(SF.FieldDeclaration(SF.VariableDeclaration(nextStageType, SF.SingletonSeparatedList(
+                SF.VariableDeclarator(nextStage)))));
 
             var variables = new Dictionary<Expr, ExpressionSyntax>();
-            variables.Add(stb.Solver.MkVar(0, stb.InputSort), SF.IdentifierName(currentInput));
+            variables.Add(stb.Solver.MkVar(0, stb.InputSort), SF.IdentifierName(inputParameter));
             var registerVar = stb.Solver.MkVar(1, stb.RegisterSort);
             variables.Add(registerVar, SF.IdentifierName(register));
 
             int nextTemp = 0;
-            Func<STbRule<Expr>, bool, Dictionary<Expr, ExpressionSyntax>, StatementSyntax> generateTransition = null;
+            Func<STbRule<Expr>, bool, Dictionary<Expr, ExpressionSyntax>, IEnumerable<StatementSyntax>> generateTransition = null;
             generateTransition = (rule, isFinal, cachedByParent) =>
             {
                 var cachedSubexpressions = new Dictionary<Expr, ExpressionSyntax>(cachedByParent);
@@ -176,33 +314,36 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                     return identifierName;
                 };
 
-                StatementSyntax ruleSyntax;
-
                 var iteRule = rule as IteRule<Expr>;
                 if (iteRule != null)
                 {
                     var conditionExpression = GenerateConcreteExpression(ctx, iteRule.Condition, variables, source, addMember, datatypeSyntaxes, knownFunctions, cacheSubexpression, cachedSubexpressions);
                     var trueNode = generateTransition(iteRule.TrueCase, isFinal, cachedSubexpressions);
                     var falseNode = generateTransition(iteRule.FalseCase, isFinal, cachedSubexpressions);
-                    transitionStatements.Add(SF.IfStatement(conditionExpression, trueNode, SF.ElseClause(falseNode)));
-                    return SF.Block(transitionStatements);
+                    transitionStatements.Add(SF.IfStatement(conditionExpression, SF.Block(trueNode), SF.ElseClause(SF.Block(falseNode))));
+                    return transitionStatements;
                 }
 
                 var baseRule = rule as BaseRule<Expr>;
                 if (baseRule != null)
                 {
-                    foreach (var yieldStatement in yieldGen.GetYields(baseRule.Yields.Select(x =>
-                        {
-                            var valueExpr = GenerateConcreteExpression(ctx, x, variables, source, addMember, datatypeSyntaxes, knownFunctions, cacheSubexpression, cachedSubexpressions);
-                            var castedExpr = SF.CastExpression(outputType, valueExpr.Parenthesize());
-                            return castedExpr;
-                        }), baseRule.Yields.Length))
+                    foreach (var yieldStatement in baseRule.Yields.Select(x =>
+                    {
+                        var valueExpr = GenerateConcreteExpression(ctx, x, variables, source, addMember, datatypeSyntaxes, knownFunctions, cacheSubexpression, cachedSubexpressions);
+                        var castedExpr = SF.CastExpression(outputType, valueExpr.Parenthesize());
+                        var invokeNextUpdate = SF.ExpressionStatement(SF.InvocationExpression(
+                            SF.IdentifierName(nextStage).Dot("Update"),
+                            SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(inputParameter))))));
+                        return invokeNextUpdate;
+                    }))
                     {
                         transitionStatements.Add(yieldStatement);
                     }
                     if (isFinal)
                     {
-                        transitionStatements.AddRange(yieldGen.GetFinalization());
+                        var invokeNextFinish = SF.ExpressionStatement(SF.InvocationExpression(
+                            SF.IdentifierName(nextStage).Dot("Finish")));
+                        transitionStatements.Add(invokeNextFinish);
                     }
                     else
                     {
@@ -211,52 +352,59 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                         {
                             transitionStatements.Add(statement);
                         }
-                        transitionStatements.Add(SF.GotoStatement(SyntaxKind.GotoStatement, SF.IdentifierName("M" + baseRule.State)));
+                        transitionStatements.Add(SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(updateAction),
+                            SF.IdentifierName($"U{baseRule.State}"))));
                     }
-                    return SF.Block(transitionStatements);
+                    return transitionStatements;
                 }
 
                 var raiseRule = rule as UndefRule<Expr>;
                 if (raiseRule != null)
                 {
-                    return SF.ThrowStatement(SF.ObjectCreationExpression(SF.IdentifierName("Exception")).WithArgumentList(SF.ArgumentList()));
+                    return new StatementSyntax[] { SF.ThrowStatement(SF.ObjectCreationExpression(SF.IdentifierName("Exception")).WithArgumentList(SF.ArgumentList())) };
                 }
 
                 throw new CodeGenerationException("Unsupported STb rule type");
             };
 
-            var moveBlocks = new List<StatementSyntax>();
-            var finalizeBlocks = new List<StatementSyntax>();
-            foreach (var state in stb.States)
+
+            members.Add(SF.ConstructorDeclaration(classDecl.Identifier)
+                .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(SF.Identifier("next"))
+                    .WithType(nextStageType))))
+                .WithBody(SF.Block(
+                    SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(nextStage), SF.IdentifierName("next"))),
+                    SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(updateAction), SF.IdentifierName($"U{stb.InitialState}"))),
+                    SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(finishAction), SF.IdentifierName($"F{stb.InitialState}"))))));
+
+            MethodDeclarationSyntax updateDecl = SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Update")
+                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)))
+                    .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(inputParameter)
+                        .WithType(inputType))));
+            members.Add(updateDecl
+                .WithBody(SF.Block().AddStatements(SF.ExpressionStatement(SF.InvocationExpression(SF.IdentifierName(updateAction),
+                SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(inputParameter)))))))));
+
+            MethodDeclarationSyntax finishDecl = SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Finish")
+                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)));
+            members.Add(finishDecl
+                .WithBody(SF.Block().AddStatements(SF.ExpressionStatement(SF.InvocationExpression(SF.IdentifierName(updateAction))))));
+
+            foreach (var controlState in stb.States)
             {
-                StatementSyntax finalizeBlock;
-                if (stb.IsFinalState(state))
-                {
-                    finalizeBlock = generateTransition(stb.GetFinalRuleFrom(state), true, new Dictionary<Expr, ExpressionSyntax>());
-                }
-                else
-                {
-                    finalizeBlock = SF.ThrowStatement(SF.ObjectCreationExpression(SF.IdentifierName("Exception")).WithArgumentList(SF.ArgumentList()));
-                }
-                var gotoFinalize = SF.GotoStatement(SyntaxKind.GotoStatement, SF.IdentifierName("F" + state));
-
-                var moveBlock = SF.Block();
-                moveBlock = moveBlock.AddStatements(inputGen.GetMoveNext(gotoFinalize).ToArray());
-                moveBlock = moveBlock.AddStatements(SH.Assignment(SF.IdentifierName(currentInput), inputGen.GetInput()));
-
-                moveBlock = moveBlock.AddStatements(generateTransition(stb.GetRuleFrom(state), false, new Dictionary<Expr, ExpressionSyntax>()));
-
-                moveBlocks.Add(SF.LabeledStatement("M" + state, moveBlock));
-                finalizeBlocks.Add(SF.LabeledStatement("F" + state, finalizeBlock));
+                members.Add(SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), $"U{controlState}")
+                    .WithBody(SF.Block(SF.CheckedStatement(SyntaxKind.UncheckedStatement,
+                        SF.Block(generateTransition(stb.GetRuleFrom(controlState), false, new Dictionary<Expr, ExpressionSyntax>())))))
+                    .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(inputParameter)
+                        .WithType(inputType)))));
+                members.Add(SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), $"F{controlState}")
+                    .WithBody(SF.Block(SF.CheckedStatement(SyntaxKind.UncheckedStatement,
+                        SF.Block(generateTransition(stb.GetRuleFrom(controlState), true, new Dictionary<Expr, ExpressionSyntax>()))))));
             }
-            body = body.AddStatements(moveBlocks.ToArray());
-            body = body.AddStatements(finalizeBlocks.ToArray());
 
-            members.Add(transduceDecl.WithBody(SF.Block(SF.CheckedStatement(SyntaxKind.UncheckedStatement, body))));
             return classDecl.AddMembers(members.ToArray());
         }
 
-        IEnumerable<StatementSyntax> GenerateUpdate(Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
+        private IEnumerable<StatementSyntax> GenerateUpdate(Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
             Expr registerVar, ExpressionSyntax registerIdentifier, Dictionary<FuncDecl, SyntaxToken> knownFunctions, Func<Expr, ExpressionSyntax, ExpressionSyntax> cacheSubexpression, Dictionary<Expr, ExpressionSyntax> cachedSubexpressions)
         {
             if (term == registerVar)
@@ -321,13 +469,13 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             yield return SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, registerIdentifier, value));
         }
 
-        ExpressionSyntax GenerateConcreteExpression(Context ctx, Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
+        private ExpressionSyntax GenerateConcreteExpression(Context ctx, Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
             Dictionary<FuncDecl, SyntaxToken> knownFunctions, Func<Expr, ExpressionSyntax, ExpressionSyntax> cacheSubexpression, Dictionary<Expr, ExpressionSyntax> cachedSubexpressions)
         {
             return DoGenerateConcreteExpression(term.SafeSimplify(ctx), variables, source, addMember, datatypeSyntaxes, knownFunctions, cacheSubexpression, cachedSubexpressions);
         }
 
-        ExpressionSyntax DoGenerateConcreteExpression(Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
+        private ExpressionSyntax DoGenerateConcreteExpression(Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
             Dictionary<FuncDecl, SyntaxToken> knownFunctions, Func<Expr, ExpressionSyntax, ExpressionSyntax> cacheSubexpression, Dictionary<Expr, ExpressionSyntax> cachedSubexpressions)
         {
             ExpressionSyntax variableSyntax;
@@ -419,7 +567,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                     }
 
                     // HUGE UGLY HACK INCOMING
-                    switch(kind)
+                    switch (kind)
                     {
                         case Z3_decl_kind.Z3_OP_BSDIV0:
                         case Z3_decl_kind.Z3_OP_BSMOD0:
@@ -712,7 +860,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         }
 
 
-        int GetProjectionIndex(FuncDecl decl)
+        private int GetProjectionIndex(FuncDecl decl)
         {
             var parameters = decl.Domain;
             if (parameters.Length == 1)
@@ -734,7 +882,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             throw new CodeGenerationException("Unsupported projection: " + decl);
         }
 
-        ExpressionSyntax NormalizeBitvecArgs(ExpressionSyntax syntax, Expr term, bool maskHighBits)
+        private ExpressionSyntax NormalizeBitvecArgs(ExpressionSyntax syntax, Expr term, bool maskHighBits)
         {
             if (term.Sort.SortKind == Z3_sort_kind.Z3_BV_SORT)
             {
@@ -776,7 +924,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             return syntax.Parenthesize();
         }
 
-        long GetSufficientIntTypeSize(long size)
+        private long GetSufficientIntTypeSize(long size)
         {
             if (size < 8)
             {
@@ -797,13 +945,13 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             return size;
         }
 
-        SyntaxKind GetSufficientIntTypeKeyword(bool isSigned, long size)
+        private SyntaxKind GetSufficientIntTypeKeyword(bool isSigned, long size)
         {
             size = GetSufficientIntTypeSize(size);
             return GetIntTypeKeyword(isSigned, size);
         }
 
-        SyntaxKind GetIntTypeKeyword(bool isSigned, long size)
+        private SyntaxKind GetIntTypeKeyword(bool isSigned, long size)
         {
             switch (size)
             {
@@ -820,7 +968,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             }
         }
 
-        SyntaxKind GetPrefixUnaryExpressionKind(Z3_decl_kind declKind)
+        private SyntaxKind GetPrefixUnaryExpressionKind(Z3_decl_kind declKind)
         {
             switch (declKind)
             {
@@ -833,7 +981,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         }
 
 
-        SyntaxKind GetBinaryExpressionKind(Z3_decl_kind declKind)
+        private SyntaxKind GetBinaryExpressionKind(Z3_decl_kind declKind)
         {
             switch (declKind)
             {
@@ -889,24 +1037,24 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             throw new CodeGenerationException("Unsupported operator kind " + declKind);
         }
 
-        bool IsPrefixUnaryOperator(Z3_decl_kind declKind)
+        private bool IsPrefixUnaryOperator(Z3_decl_kind declKind)
         {
             return IsSignedPrefixUnaryOperator(declKind) ||
                  declKind == Z3_decl_kind.Z3_OP_BNOT;
         }
 
-        bool IsSignedPrefixUnaryOperator(Z3_decl_kind declKind)
+        private bool IsSignedPrefixUnaryOperator(Z3_decl_kind declKind)
         {
             return declKind == Z3_decl_kind.Z3_OP_BNEG;
         }
 
-        bool IsBinaryOperator(Z3_decl_kind declKind)
+        private bool IsBinaryOperator(Z3_decl_kind declKind)
         {
             return IsUnsignedOrAgnosticBinaryOperator(declKind) || IsSignedBinaryOperator(declKind);
         }
 
         // Shifts are handled separately from other binary operators
-        bool IsShift(Z3_decl_kind declKind)
+        private bool IsShift(Z3_decl_kind declKind)
         {
             return
                 (declKind == Z3_decl_kind.Z3_OP_BLSHR ||
@@ -914,7 +1062,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                  declKind == Z3_decl_kind.Z3_OP_BASHR);
         }
 
-        bool IsUnsignedOrAgnosticBinaryOperator(Z3_decl_kind declKind)
+        private bool IsUnsignedOrAgnosticBinaryOperator(Z3_decl_kind declKind)
         {
             return
                 (declKind == Z3_decl_kind.Z3_OP_GT ||
@@ -940,7 +1088,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                  declKind == Z3_decl_kind.Z3_OP_BUREM);
         }
 
-        bool IsSignedBinaryOperator(Z3_decl_kind declKind)
+        private bool IsSignedBinaryOperator(Z3_decl_kind declKind)
         {
             return
                 (declKind == Z3_decl_kind.Z3_OP_SGT ||
@@ -952,7 +1100,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                  declKind == Z3_decl_kind.Z3_OP_BASHR);
         }
 
-        bool BitsDependOnlyOnLowerBits(Z3_decl_kind declKind)
+        private bool BitsDependOnlyOnLowerBits(Z3_decl_kind declKind)
         {
             return
                 (declKind == Z3_decl_kind.Z3_OP_BAND ||
@@ -964,7 +1112,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                  declKind == Z3_decl_kind.Z3_OP_BNEG);
         }
 
-        INamedTypeSymbol GetIntType(bool isSigned, uint size)
+        private INamedTypeSymbol GetIntType(bool isSigned, uint size)
         {
             if (isSigned)
             {
@@ -998,7 +1146,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         }
 
         int DTStructIndex = 0;
-        TypeSyntax GetTypeForSort(Sort sort, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes)
+        private TypeSyntax GetTypeForSort(Sort sort, TransducerCompilation source, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes)
         {
             switch (sort.SortKind)
             {

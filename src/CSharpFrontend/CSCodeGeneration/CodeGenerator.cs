@@ -26,8 +26,10 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             _concreteCG = new ConcreteCodeGenerator(compilation);
         }
 
-        public SyntaxTree Generate(TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb)
+        public SyntaxTree Generate(TransducerCompilation source)
         {
+            var stb = source.Transducer;
+
             var sourceNamespace = source.DeclarationType.ContainingNamespace.DeclaringSyntaxReferences[0].GetSyntax() as NamespaceDeclarationSyntax;
             if (sourceNamespace == null)
             {
