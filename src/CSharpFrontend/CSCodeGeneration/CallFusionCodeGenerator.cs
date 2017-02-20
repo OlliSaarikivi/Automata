@@ -44,9 +44,10 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             {
                 GetStages(composition._inner, stages);
                 GetStages(composition._outer, stages);
-            } else
+            }
+            else
             {
-                stages.Add(composition);
+                stages.Add(transducer);
             }
         }
 
@@ -71,36 +72,36 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             var sinkClassDecl = SF.ClassDeclaration("Sink");
             var bufferType = SF.ArrayType(SH.PredefinedType(SyntaxKind.ByteKeyword),
                 SF.SingletonList(SF.ArrayRankSpecifier(SF.SingletonSeparatedList((ExpressionSyntax)SH.Literal(BufferSize)))));
-            sinkClassDecl = sinkClassDecl.AddMembers(
-                SF.FieldDeclaration(SF.VariableDeclaration(_stream.CreateSyntax()).AddVariables(SF.VariableDeclarator(outputParameter))),
-                SF.FieldDeclaration(SF.VariableDeclaration(bufferType).AddVariables(SF.VariableDeclarator(outputBuffer)
-                    .WithInitializer(SF.EqualsValueClause(SF.ArrayCreationExpression(bufferType))))),
-                SF.FieldDeclaration(SF.VariableDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword)).AddVariables(SF.VariableDeclarator(outputIndex)
-                    .WithInitializer(SF.EqualsValueClause(SH.Literal(0))))),
 
-                SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Update")
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.FieldDeclaration(SF.VariableDeclaration(_stream.CreateSyntax()).AddVariables(SF.VariableDeclarator(outputParameter))));
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.FieldDeclaration(SF.VariableDeclaration(bufferType).AddVariables(SF.VariableDeclarator(outputBuffer)
+                    .WithInitializer(SF.EqualsValueClause(SF.ArrayCreationExpression(bufferType))))));
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.FieldDeclaration(SF.VariableDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword)).AddVariables(SF.VariableDeclarator(outputIndex)
+                    .WithInitializer(SF.EqualsValueClause(SH.Literal(0))))));
+
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Update")
                     .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)))
                     .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(sinkInputParameter)
                         .WithType(sinkType))))
-                    .WithBody(SF.Block(GetYields(new ExpressionSyntax[] { SF.IdentifierName(sinkInputParameter) }, 1))),
-                SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Finish")
+                    .WithBody(SF.Block(GetYields(new ExpressionSyntax[] { SF.IdentifierName(sinkInputParameter) }, 1))));
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.MethodDeclaration(SF.PredefinedType(SF.Token(SyntaxKind.VoidKeyword)), "Finish")
                     .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword)))
                     .WithBody(SF.Block(
                         SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanExpression, SF.IdentifierName(outputIndex), SH.Literal(0)),
                                     SF.ExpressionStatement(SF.IdentifierName(outputParameter).Dot("Write").Invoke(SF.IdentifierName(outputBuffer), SH.Literal(0), SF.IdentifierName(outputIndex)))),
                         SF.ReturnStatement()
-                        )),
-                SF.ConstructorDeclaration("Sink")
+                        )));
+            sinkClassDecl = sinkClassDecl.AddMembers(SF.ConstructorDeclaration("Sink")
                     .WithParameterList(SF.ParameterList(SF.SingletonSeparatedList(SF.Parameter(outputParameter).WithType(_stream.CreateSyntax()))))
                     .WithBody(SF.Block(
                         SF.ExpressionStatement(SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                            SF.IdentifierName(SF.Token(SyntaxKind.ThisKeyword)).Dot(SF.IdentifierName(outputParameter)),
+                            SF.ThisExpression().Dot(SF.IdentifierName(outputParameter)),
                             SF.IdentifierName(outputParameter)))
                         )));
             implClassDecl = implClassDecl.AddMembers(sinkClassDecl);
 
-            TypeSyntax nextStageType = SF.ParseTypeName("Microsoft.Automata.CSharpFrontend.Runtime.Transducer");
-            ExpressionSyntax newExpression = SF.ObjectCreationExpression(nextStageType)
+            IdentifierNameSyntax nextStageType = SF.IdentifierName(sinkClassDecl.Identifier);
+            ExpressionSyntax newExpression = SF.ObjectCreationExpression(SF.IdentifierName(implClassDecl.Identifier).Qualified(nextStageType))
                 .WithArgumentList(SF.ArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(outputParameter)))));
             foreach (var source in stages)
             {
@@ -109,8 +110,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                 var classDecl = source.DeclarationType.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<ClassDeclarationSyntax>().FirstOrDefault()
                     .WithLeadingTrivia().WithTrailingTrivia() // Strip any trivia
                     .WithMembers(SF.List<MemberDeclarationSyntax>())
-                    .WithAttributeLists(SF.List<AttributeListSyntax>())
-                    .WithModifiers(SF.TokenList(SF.Token(SyntaxKind.PrivateKeyword)));
+                    .WithAttributeLists(SF.List<AttributeListSyntax>());
                 if (classDecl == null)
                 {
                     throw new Exception("Class declaration for " + source.DeclarationType + " not found");
