@@ -49,4 +49,12 @@ namespace Microsoft.Automata.CSharpFrontend.Runtime.Transducer
         {
         }
     }
+
+    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+    public sealed class SuppressCodeGeneration : Attribute
+    {
+        public SuppressCodeGeneration()
+        {
+        }
+    }
 }

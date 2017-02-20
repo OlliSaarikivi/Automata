@@ -14,6 +14,7 @@ namespace Microsoft.Automata.CSharpFrontend
     {
         public INamedTypeSymbol DeclarationType { get; private set; }
         public HashSet<ShowGraph.Stage> ShowGraphStages { get; set; }
+        public bool SuppressCodeGeneration { get; set; }
         public abstract STb<FuncDecl, Expr, Sort> Transducer { get; }
         /// <summary>
         /// The background functions used in this transducer for which code has to be generated.

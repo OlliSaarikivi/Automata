@@ -60,10 +60,11 @@ namespace Microsoft.Automata.CSharpFrontend
                         }
                         transducer = GetSpecialCompilation(ctx, compilation, model, declarationType, attributes);
                     }
-                    // Handle the [ShowGraph()] attribute
+                    // Handle the [ShowGraph()] and [SuppressCodeGeneration()] attributes
                     if (transducer != null)
                     {
                         transducer.ShowGraphStages = GetShowGraphStages(compilation, model, attributes);
+                        transducer.SuppressCodeGeneration = GetSuppressCodeGeneration(compilation, model, attributes);
                         transducers.Add(declarationType, transducer);
                     }
                 }
@@ -131,6 +132,12 @@ using System.Collections.Generic;
             {
                 toCompile = from c in toCompile
                             join n in onlyTypes on c.DeclarationType.Name equals n
+                            select c;
+            }
+            else
+            {
+                toCompile = from c in toCompile
+                            where !c.SuppressCodeGeneration
                             select c;
             }
 
@@ -237,6 +244,15 @@ using System.Collections.Generic;
             }
 
             return result;
+        }
+
+        static bool GetSuppressCodeGeneration(Compilation compilation, SemanticModel model, IEnumerable<AttributeSyntax> attributes)
+        {
+            var suppressCodeGenerationAttribute = compilation.GetTypeByMetadataName(typeof(SuppressCodeGeneration).FullName);
+            var suppressCodeGenerationAttributes = attributes.Select(Syntax => new { Syntax, CtorSymbol = model.GetSymbolInfo(Syntax).Symbol as IMethodSymbol })
+                .Where(x => x.CtorSymbol != null)
+                .Where(x => x.CtorSymbol.ContainingType == suppressCodeGenerationAttribute);
+            return suppressCodeGenerationAttributes.Any();
         }
     }
 }
