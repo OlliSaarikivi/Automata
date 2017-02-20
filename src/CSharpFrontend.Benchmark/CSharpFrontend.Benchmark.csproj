@@ -1,0 +1,145 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{71B27FC5-1F70-4C06-A851-663667B6E0DA}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Microsoft.Automata.CSharpFrontend.Benchmark</RootNamespace>
+    <AssemblyName>CSharpFrontend.Benchmark</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\..\bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <UseVSHostingProcess>true</UseVSHostingProcess>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="XPathReader">
+      <HintPath>.\XPathReader.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Base64.cs" />
+    <Compile Include="Fibonacci.cs" />
+    <Compile Include="Compositions.cs" />
+    <Compile Include="DataProviders.cs" />
+    <Compile Include="gen\TransducerClient.Average.g.cs" />
+    <Compile Include="gen\TransducerClient.B64FormattedDeltaUTF8.g.cs" />
+    <Compile Include="gen\TransducerClient.B64ToWindowedAverageToB64.g.cs" />
+    <Compile Include="gen\TransducerClient.Base64Decoder.g.cs" />
+    <Compile Include="gen\TransducerClient.Base64Encoder.g.cs" />
+    <Compile Include="gen\TransducerClient.BytesToInt32.g.cs" />
+    <Compile Include="gen\TransducerClient.CCCol1Int.g.cs" />
+    <Compile Include="gen\TransducerClient.CHSILungCancer.g.cs" />
+    <Compile Include="gen\TransducerClient.CHSITotalBirths.g.cs" />
+    <Compile Include="gen\TransducerClient.CHSITotalDeaths.g.cs" />
+    <Compile Include="gen\TransducerClient.Col3Int.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV1abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV2abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV3abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV4abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV5abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV6abc.g.cs" />
+    <Compile Include="gen\TransducerClient.CSV7abc.g.cs" />
+    <Compile Include="gen\TransducerClient.DBLPYear.g.cs" />
+    <Compile Include="gen\TransducerClient.Delta.g.cs" />
+    <Compile Include="gen\TransducerClient.EnglishHuffmanEncoder.g.cs" />
+    <Compile Include="gen\TransducerClient.FormatInt32Lines.g.cs" />
+    <Compile Include="gen\TransducerClient.FormattedLineCount.g.cs" />
+    <Compile Include="gen\TransducerClient.HuffmanToLCBytes.g.cs" />
+    <Compile Include="gen\TransducerClient.Int32ToBytes.g.cs" />
+    <Compile Include="gen\TransducerClient.LineCount.g.cs" />
+    <Compile Include="gen\TransducerClient.Maximum.g.cs" />
+    <Compile Include="gen\TransducerClient.Minimum.g.cs" />
+    <Compile Include="gen\TransducerClient.MondialCityPopulation.g.cs" />
+    <Compile Include="gen\TransducerClient.ProteinLengths.g.cs" />
+    <Compile Include="gen\TransducerClient.SafeFibonacciBytes.g.cs" />
+    <Compile Include="gen\TransducerClient.SBOEmployees.g.cs" />
+    <Compile Include="gen\TransducerClient.SBOGrossReceipts.g.cs" />
+    <Compile Include="gen\TransducerClient.SBOPayroll.g.cs" />
+    <Compile Include="gen\TransducerClient.SQLInsertInt32.g.cs" />
+    <Compile Include="gen\TransducerClient.TPCDICustomerIds.g.cs" />
+    <Compile Include="gen\TransducerClient.UTF16ToUTF8.g.cs" />
+    <Compile Include="gen\TransducerClient.UTF8MaxCol3IntB64.g.cs" />
+    <Compile Include="gen\TransducerClient.UTF8ToUTF16.g.cs" />
+    <Compile Include="gen\TransducerClient.WindowedAverage10.g.cs" />
+    <Compile Include="gen\TransducerClient.XML1abc.g.cs" />
+    <Compile Include="gen\TransducerClient.XML2abc.g.cs" />
+    <Compile Include="gen\TransducerClient.XML3abc.g.cs" />
+    <Compile Include="gen\TransducerClient.XML4abc.g.cs" />
+    <Compile Include="HandFused\All.cs" />
+    <Compile Include="HandFused\StreamHolder.cs" />
+    <Compile Include="HandFused\UpdateStream.cs" />
+    <Compile Include="HTML.cs" />
+    <Compile Include="LZ78.cs" />
+    <Compile Include="LZW.cs" />
+    <Compile Include="ManualCSVPipelines.cs" />
+    <Compile Include="ManualPipelines.cs" />
+    <Compile Include="ManualXMLPipelines.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StreamBase64Decoder.cs" />
+    <Compile Include="Queries.cs" />
+    <Compile Include="UTF.cs" />
+    <Compile Include="Utilities.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CSharpFrontend\CSharpFrontend.csproj">
+      <Project>{c237ffc1-6f80-4d0e-8f70-38f6a9614f5a}</Project>
+      <Name>CSharpFrontend</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
+  <!-- 
+  <Target Name="BeforeBuild">
+    <Exec Command="..\TransducerCompiler\ConsoleApp\bin\Release\TransducerCompiler.exe TransducerBenchmarks.csproj gen\" />
+  </Target>
+    -->
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

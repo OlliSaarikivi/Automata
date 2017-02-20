@@ -1,0 +1,1 @@
+bin\Release\AutomataCSharpCLI.exe src\CSharpFrontend.Benchmark\CSharpFrontend.Benchmark.csproj src\CSharpFrontend.Benchmark\gen
