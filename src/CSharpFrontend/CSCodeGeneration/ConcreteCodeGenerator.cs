@@ -60,8 +60,6 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
 
                 classDecl = DoGenerate("FromStreamToStream", source, stb, classDecl, knownFunctions, streamInputGen, streamYieldGen, commonExpressionsInTemporaries);
                 classDecl = DoGenerate("FromArrayToStream", source, stb, classDecl, knownFunctions, arrayInputGen, streamYieldGen, commonExpressionsInTemporaries);
-
-                classDecl = classDecl.AddMembers(new CallFusionCodeGenerator(_compilation).GenerateMembers(source, "CallFusedFromStreamToStream").ToArray());
             }
 
             return classDecl;
