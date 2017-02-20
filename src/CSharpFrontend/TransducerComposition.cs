@@ -1,6 +1,5 @@
 ﻿using Microsoft.Automata;
 using Microsoft.CodeAnalysis;
-using Microsoft.Automata.CSharpFrontend.Runtime.Transducer;
 using Microsoft.Z3;
 using System;
 using System.Collections.Generic;

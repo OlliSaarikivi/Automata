@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.Automata.CSharpFrontend.CodeGeneration;
 using Microsoft.Automata.CSharpFrontend.SpecialTransducers;
-using Microsoft.Automata.CSharpFrontend.Runtime.Transducer;
 using Microsoft.Z3;
 using System;
 using System.Collections.Generic;

@@ -12,7 +12,6 @@ using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Automata.CSharpFrontend.Runtime.Transducer;
 
 namespace Microsoft.Automata.CSharpFrontend
 {

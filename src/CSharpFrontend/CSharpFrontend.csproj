@@ -95,6 +95,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Attributes.cs" />
     <Compile Include="CSCodeGeneration\CodeGenerationException.cs" />
     <Compile Include="CSCodeGeneration\ComputationNode.cs" />
     <Compile Include="CSCodeGeneration\ComputationTree.cs" />
@@ -102,12 +103,11 @@
     <Compile Include="CSCodeGeneration\ConcreteCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\ConcreteInputCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\ConcreteYieldCodeGenerator.cs" />
-    <Compile Include="CSCodeGeneration\ParasailExpressionGenerator.cs" />
     <Compile Include="CSCodeGeneration\CodeGenerator.cs" />
-    <Compile Include="CSCodeGeneration\ParasailCodeGenerator.cs" />
     <Compile Include="CSCodeGeneration\SyntaxHelpers.cs" />
     <Compile Include="CSharpParser.cs" />
     <Compile Include="CompileTransducerTask.cs" />
+    <Compile Include="Transducer.cs" />
     <Compile Include="SpecialTransducers\XPathMatcherGeneration.cs" />
     <Compile Include="SpecialTransducers\ParsingMatcherGeneration.cs" />
     <Compile Include="SpecialTransducers\HuffmanGeneration.cs" />
@@ -157,10 +157,6 @@
     <ProjectReference Include="..\Automata\Automata.csproj">
       <Project>{bc861e29-027d-4ac6-ab24-a7b0cd0fb5e8}</Project>
       <Name>Automata</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\CSharpFrontend.Runtime\CSharpFrontend.Runtime.csproj">
-      <Project>{ad7cf764-05ee-4de8-9c2e-aab1a1c49d1c}</Project>
-      <Name>CSharpFrontend.Runtime</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

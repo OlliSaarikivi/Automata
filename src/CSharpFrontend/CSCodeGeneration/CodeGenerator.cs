@@ -17,12 +17,10 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
 
     class CodeGenerator
     {
-        ParasailCodeGenerator _parasailCG;
         ConcreteCodeGenerator _concreteCG;
 
         public CodeGenerator(Compilation compilation)
         {
-            _parasailCG = new ParasailCodeGenerator(compilation);
             _concreteCG = new ConcreteCodeGenerator(compilation);
         }
 
@@ -45,19 +43,17 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
             {
                 throw new Exception("Class declaration for " + source.DeclarationType + " not found");
             }
-
-            //classDecl = _parasailCG.Generate(source, stb, classDecl);
+            
             classDecl = _concreteCG.Generate(source, stb, classDecl);
 
-            var riseNamespace = SF.IdentifierName("Microsoft").Qualified(SF.IdentifierName("Research")).Qualified(SF.IdentifierName("RiSE"));
+            var automataNamespace = SF.IdentifierName("Microsoft").Qualified(SF.IdentifierName("Automata")).Qualified(SF.IdentifierName("CSharpFrontend"));
             var root = SF.CompilationUnit()
                 .WithUsings(SF.List(new[]
                 {
                     SF.UsingDirective(SF.IdentifierName("System")),
                     SF.UsingDirective(SF.IdentifierName("System").Qualified(SF.IdentifierName("IO"))),
                     SF.UsingDirective(SF.IdentifierName("System").Qualified(SF.IdentifierName("Collections")).Qualified(SF.IdentifierName("Generic"))),
-                    SF.UsingDirective(riseNamespace),
-                    SF.UsingDirective(riseNamespace.Qualified(SF.IdentifierName("Transducer"))),
+                    SF.UsingDirective(automataNamespace),
                 }))
                 .WithMembers(SF.SingletonList((MemberDeclarationSyntax)SF.NamespaceDeclaration(sourceNamespace.Name)
                     .WithMembers(SF.SingletonList((MemberDeclarationSyntax)classDecl))));
