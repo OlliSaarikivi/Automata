@@ -32,10 +32,10 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
     [SuppressCodeGeneration()] partial class FormattedLineCountUTF8 : Composition<UTF8ToUTF16, LineCount> { }
     partial class FormattedLineCount : Composition<FormattedLineCountUTF8, UTF8ToFormattedLineCount> { }//Top
 
-    [HuffmanDecoder(@"C:\Users\ollis\Desktop\datasets\pg2701.txt")]
+    [HuffmanDecoder(@"datasets\pg2701.txt")]
     partial class EnglishHuffmanDecoder : SpecialTransducer { }
 
-    [HuffmanEncoder(@"C:\Users\ollis\Desktop\datasets\pg2701.txt")]
+    [HuffmanEncoder(@"datasets\pg2701.txt")]
     partial class EnglishHuffmanEncoder : SpecialTransducer { }
 
     [SuppressCodeGeneration()] partial class UTF8ToLC : Composition<UTF8ToUTF16, LineCount> { }
