@@ -7,7 +7,7 @@ if ($Args.Count -gt 0) {
 foreach ($target in $targets) {
     echo $target
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $app = Start-Process -PassThru -RedirectStandardOutput "compiler_bench\$target.out" -RedirectStandardError "compiler_bench\$target.err" -FilePath '..\TransducerCompiler\ConsoleApp\bin\Release\TransducerCompiler.exe' -ArgumentList "TransducerBenchmarks.csproj","compiler_bench\",$target
+    $app = Start-Process -PassThru -RedirectStandardOutput "compiler_bench\$target.out" -RedirectStandardError "compiler_bench\$target.err" -FilePath '..\..\bin\Release\AutomataCSharpCLI.exe' -ArgumentList "CSharpFrontend.Benchmark.csproj","compiler_bench\",$target
     $app.WaitForExit(3600*1000)
     $sw.Stop()
     if ($app.HasExited) {
