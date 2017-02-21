@@ -182,7 +182,7 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
 
         static void Main(string[] args)
         {
-            var datasetsDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + @"\..\..\src\CSharpFrontend.Benchmark\datasets\";
+            var datasetsDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + @"\..\..\datasets\";
             Func<byte[]> bookProvider = (() => DataProviders.RepeatedFile($"{datasetsDir}pg2701.txt"));
             Func<byte[]> ccProvider = (() => DataProviders.SingleFile($"{datasetsDir}Consumer_Complaints.csv"));
             Func<byte[]> birthDeathProvider = (() => DataProviders.SingleFile($"{datasetsDir}MEASURESOFBIRTHANDDEATH.csv"));
@@ -329,7 +329,7 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                 var answer = Console.ReadLine().Trim();
                 if (answer == "")
                 {
-                    selections = Enumerable.Range(1, streamBenchmarks.Count + arrayBenchmarks.Count).Reverse().ToArray();
+                    selections = Enumerable.Range(1, streamBenchmarks.Count + arrayBenchmarks.Count).ToArray();
                 }
                 else
                 {
