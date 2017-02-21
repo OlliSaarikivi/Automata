@@ -121,17 +121,17 @@ namespace Microsoft.Automata.CSharpFrontend
             var stb = inner.Compose(outer);
             var stb1 = stb;
             if (ShowGraphStages.Contains(ShowGraph.Stage.UnSimplified)) { stb.ToST().ShowGraph(); }
-            stb1 = stb.Minimize();
-            _minimizeRemoved += StatesRemoved(stb, stb1);
-            stb = stb1;
+            //stb1 = stb.Minimize();
+            //_minimizeRemoved += StatesRemoved(stb, stb1);
+            //stb = stb1;
             var k = (K < 0 ? (stb.StateCount == 1 ? 2 : stb.StateCount) : K);
             stb1 = stb.Simplify(K);
             _simplifyRemoved += TotalIteRules(stb) - TotalIteRules(stb1);
             stb = stb1;
             stb = stb.Flatten();
-            stb1 = stb.Minimize();
-            _minimizeRemoved += StatesRemoved(stb, stb1);
-            stb = stb1;
+            //stb1 = stb.Minimize();
+            //_minimizeRemoved += StatesRemoved(stb, stb1);
+            //stb = stb1;
             if (ShowGraphStages.Contains(ShowGraph.Stage.Simplified)) { stb.ToST().ShowGraph(); }
 
             Console.WriteLine(DeclarationType.Name + ": K=" + k + " Min=" + MinimizeRemoved + " Simp=" + SimplifyRemoved + " TotalCS=" + stb.StateCount + " TotalITE=" + TotalIteRules(stb));
