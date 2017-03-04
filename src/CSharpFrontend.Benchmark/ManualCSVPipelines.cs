@@ -23,7 +23,7 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             output.Write(result, 0, result.Length);
         }
 
-        static readonly Regex regex = new Regex("(?<value>\\d+)(,([^\\n,]*)|(\"[^\\n\"]*\")){12},([^\\n]*)", RegexOptions.Compiled);
+        static readonly Regex regex = new Regex("((?<value>\\d+)(,([^\\n,]*)|(\"[^\\n\"]*\")){12},([^\\n]*)\\n)*", RegexOptions.Compiled);
         public static void HandOptimized(byte[] input, Stream output)
         {
             var asString = System.Text.Encoding.UTF8.GetString(input);

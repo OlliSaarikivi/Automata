@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
+using System.Globalization;
 
 namespace Microsoft.Automata.CSharpFrontend.Benchmark
 {
@@ -180,6 +181,37 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             });
         }
 
+        static double QuickBenchmarkStream(Func<byte[]> dataProvider, Action<Stream, Stream> function)
+        {
+            var input = new MemoryStream(dataProvider());
+
+            // Warm up the cache
+            function(input, new MemoryStream());
+            input.Seek(0, SeekOrigin.Begin);
+
+            var output = new MemoryStream();
+            GC.Collect();
+            var sw = Stopwatch.StartNew();
+            function(input, output);
+            sw.Stop();
+            return Throughput(input.Length, sw.Elapsed.TotalSeconds);
+        }
+
+        static double QuickBenchmarkArray(Func<byte[]> dataProvider, Action<byte[], Stream> function)
+        {
+            var input = dataProvider();
+
+            // Warm up the cache
+            function(input, new MemoryStream());
+
+            var output = new MemoryStream();
+            GC.Collect();
+            var sw = Stopwatch.StartNew();
+            function(input, output);
+            sw.Stop();
+            return Throughput(input.Length, sw.Elapsed.TotalSeconds);
+        }
+
         static void Main(string[] args)
         {
             var datasetsDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + @"\..\..\datasets\";
@@ -311,6 +343,167 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                 Tuple.Create("Mondial largest population (XmlDocument)", mondial,
                     (Action<byte[], Stream>)ManualXML4.HandOptimized, (Action<byte[], Stream>)ManualXML4.GeneratedStages),
             };
+
+            if (args.Length > 0 && args[0] == "-fig9WithoutConfidence")
+            {
+                var fig9Path = ResultsDir + "Figure9_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".csv";
+
+                Directory.CreateDirectory(ResultsDir);
+
+                var fig9Writer = new StreamWriter(File.OpenWrite(fig9Path));
+
+                fig9Writer.WriteLine("sep=,"); // Recognized by Excel
+
+                Func<int, StreamWriter, double> doStreamBenchmark = (index, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    return QuickBenchmarkStream(benchmark.Item2, benchmark.Item3);
+                };
+                Action<int, double, StreamWriter> commitStreamBenchmark = (index, throughput, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+                Action<int, StreamWriter> addStreamBenchmark = (index, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    var throughput = QuickBenchmarkStream(benchmark.Item2, benchmark.Item3);
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+                Action<int, StreamWriter> addArrayBenchmark = (index, output) =>
+                {
+                    var benchmark = arrayBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    var throughput = QuickBenchmarkArray(benchmark.Item2, benchmark.Item3);
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+
+                addArrayBenchmark(11, fig9Writer);
+                addStreamBenchmark(15, fig9Writer);
+                addArrayBenchmark(0, fig9Writer);
+                addStreamBenchmark(0, fig9Writer);
+                addArrayBenchmark(12, fig9Writer);
+                addStreamBenchmark(16, fig9Writer);
+                addArrayBenchmark(1, fig9Writer);
+                addStreamBenchmark(1, fig9Writer);
+                addArrayBenchmark(13, fig9Writer);
+                addStreamBenchmark(17, fig9Writer);
+                addArrayBenchmark(2, fig9Writer);
+                addStreamBenchmark(2, fig9Writer);
+                addArrayBenchmark(14, fig9Writer);
+                addStreamBenchmark(18, fig9Writer);
+                addArrayBenchmark(3, fig9Writer);
+                addStreamBenchmark(3, fig9Writer);
+                addArrayBenchmark(15, fig9Writer);
+                addStreamBenchmark(19, fig9Writer);
+                addArrayBenchmark(4, fig9Writer);
+                addStreamBenchmark(4, fig9Writer);
+                addArrayBenchmark(16, fig9Writer);
+                addStreamBenchmark(20, fig9Writer);
+                addArrayBenchmark(5, fig9Writer);
+                addStreamBenchmark(5, fig9Writer);
+                addArrayBenchmark(17, fig9Writer);
+                addStreamBenchmark(21, fig9Writer);
+                addStreamBenchmark(6, fig9Writer);
+                addArrayBenchmark(6, fig9Writer);
+                addArrayBenchmark(18, fig9Writer);
+                addStreamBenchmark(22, fig9Writer);
+                addArrayBenchmark(7, fig9Writer);
+                addStreamBenchmark(7, fig9Writer);
+                addArrayBenchmark(19, fig9Writer);
+                addStreamBenchmark(23, fig9Writer);
+                addArrayBenchmark(8, fig9Writer);
+                addStreamBenchmark(8, fig9Writer);
+                addArrayBenchmark(20, fig9Writer);
+                addStreamBenchmark(24, fig9Writer);
+                addArrayBenchmark(9, fig9Writer);
+                addStreamBenchmark(9, fig9Writer);
+                addArrayBenchmark(21, fig9Writer);
+                addStreamBenchmark(25, fig9Writer);
+                addArrayBenchmark(10, fig9Writer);
+                addStreamBenchmark(10, fig9Writer);
+
+                fig9Writer.Dispose();
+                return;
+            }
+
+            if (args.Length > 0 && args[0] == "-fig10WithoutConfidence")
+            {
+                var fig10Path = ResultsDir + "Figure10_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".csv";
+
+                Directory.CreateDirectory(ResultsDir);
+                
+                var fig10Writer = new StreamWriter(File.OpenWrite(fig10Path));
+                
+                fig10Writer.WriteLine("sep=,"); // Recognized by Excel
+
+                Func<int, StreamWriter, double> doStreamBenchmark = (index, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    return QuickBenchmarkStream(benchmark.Item2, benchmark.Item3);
+                };
+                Action<int, double, StreamWriter> commitStreamBenchmark = (index, throughput, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+                Action<int, StreamWriter> addStreamBenchmark = (index, output) =>
+                {
+                    var benchmark = streamBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    var throughput = QuickBenchmarkStream(benchmark.Item2, benchmark.Item3);
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+                Action<int, StreamWriter> addArrayBenchmark = (index, output) =>
+                {
+                    var benchmark = arrayBenchmarks[index];
+                    Console.Write(benchmark.Item1 + ": ");
+                    var throughput = QuickBenchmarkArray(benchmark.Item2, benchmark.Item3);
+                    Console.WriteLine(throughput.ToString(CultureInfo.InvariantCulture));
+                    output.WriteLine(benchmark.Item1 + "," + throughput.ToString(CultureInfo.InvariantCulture));
+                    output.Flush();
+                };
+
+                //var throughput31 = doStreamBenchmark(31, fig10Writer);
+                
+                addArrayBenchmark(26, fig10Writer);
+                addStreamBenchmark(30, fig10Writer);
+                addArrayBenchmark(22, fig10Writer);
+                addStreamBenchmark(26, fig10Writer);
+                addStreamBenchmark(11, fig10Writer);
+                //addArrayBenchmark(27, fig10Writer);
+                //commitStreamBenchmark(31, throughput31, fig10Writer);
+                addStreamBenchmark(31, fig10Writer);
+                addArrayBenchmark(23, fig10Writer);
+                addStreamBenchmark(27, fig10Writer);
+                addStreamBenchmark(12, fig10Writer);
+                addArrayBenchmark(28, fig10Writer);
+                addStreamBenchmark(32, fig10Writer);
+                addArrayBenchmark(24, fig10Writer);
+                addStreamBenchmark(28, fig10Writer);
+                addStreamBenchmark(13, fig10Writer);
+                addArrayBenchmark(29, fig10Writer);
+                addStreamBenchmark(33, fig10Writer);
+                addArrayBenchmark(25, fig10Writer);
+                addStreamBenchmark(29, fig10Writer);
+                addStreamBenchmark(14, fig10Writer);
+                
+                fig10Writer.Dispose();
+                return;
+            }
 
             while (true)
             {

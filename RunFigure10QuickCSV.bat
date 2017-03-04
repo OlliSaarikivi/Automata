@@ -1,0 +1,1 @@
+bin\Release\CSharpFrontend.Benchmark.exe -fig10WithoutConfidence
