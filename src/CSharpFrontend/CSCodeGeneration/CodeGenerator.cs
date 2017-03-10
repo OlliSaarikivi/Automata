@@ -51,6 +51,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                 .WithUsings(SF.List(new[]
                 {
                     SF.UsingDirective(SF.IdentifierName("System")),
+                    SF.UsingDirective(SF.IdentifierName("System").Qualified(SF.IdentifierName("Text"))),
                     SF.UsingDirective(SF.IdentifierName("System").Qualified(SF.IdentifierName("IO"))),
                     SF.UsingDirective(SF.IdentifierName("System").Qualified(SF.IdentifierName("Collections")).Qualified(SF.IdentifierName("Generic"))),
                     SF.UsingDirective(automataNamespace),
