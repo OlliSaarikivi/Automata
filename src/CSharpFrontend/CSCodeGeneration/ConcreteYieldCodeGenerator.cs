@@ -90,6 +90,74 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         }
     }
 
+    class StringYieldCodeGenerator : ConcreteYieldCodeGenerator
+    {
+        const int BufferSize = 16384;
+
+        INamedTypeSymbol _stringBuilder;
+        SyntaxToken output = SF.Identifier("output");
+        SyntaxToken outputBuffer = SF.Identifier("oBuf");
+        SyntaxToken outputIndex = SF.Identifier("oIndex");
+
+        public StringYieldCodeGenerator(Compilation compilation)
+        {
+            _stringBuilder = compilation.GetTypeByMetadataName(typeof(StringBuilder).FullName);
+        }
+
+        public TypeSyntax GetReturnType()
+        {
+            return SF.PredefinedType(SF.Token(SyntaxKind.StringKeyword));
+        }
+
+        public IEnumerable<ParameterSyntax> GetParameters()
+        {
+            yield break;
+        }
+
+        public IEnumerable<StatementSyntax> GetInitialization()
+        {
+            yield return SH.LocalDeclaration(SF.IdentifierName("var"), output,
+                SF.ObjectCreationExpression(_stringBuilder.CreateSyntax()));
+            var bufferType = SF.ArrayType(SH.PredefinedType(SyntaxKind.CharKeyword),
+                SF.SingletonList(SF.ArrayRankSpecifier(SF.SingletonSeparatedList((ExpressionSyntax)SH.Literal(BufferSize)))));
+            yield return SH.LocalDeclaration(SF.IdentifierName("var"), outputBuffer,
+                SF.ArrayCreationExpression(bufferType));
+            yield return SH.LocalDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword), outputIndex, SH.Literal(0));
+        }
+
+        public IEnumerable<StatementSyntax> GetYields(IEnumerable<ExpressionSyntax> yields, int numYields)
+        {
+            if (numYields == 0)
+            {
+                yield break;
+            }
+            if (numYields > BufferSize)
+            {
+                throw new NotImplementedException();
+            }
+            yield return SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanExpression, SF.IdentifierName(outputIndex), SH.Literal(BufferSize - numYields)),
+                SF.Block(
+                    SF.ExpressionStatement(SF.IdentifierName(output).Dot("Append").Invoke(SF.IdentifierName(outputBuffer), SH.Literal(0), SF.IdentifierName(outputIndex))),
+                    SH.Assignment(SF.IdentifierName(outputIndex), SH.Literal(0))));
+            int index = 0;
+            foreach (var yieldSyntax in yields)
+            {
+                yield return SH.Assignment(SF.ElementAccessExpression(SF.IdentifierName(outputBuffer), SF.BracketedArgumentList(SF.SingletonSeparatedList(SF.Argument(
+                        SF.BinaryExpression(SyntaxKind.AddExpression, SF.IdentifierName(outputIndex), SH.Literal(index)))))),
+                    yieldSyntax);
+                ++index;
+            }
+            yield return SH.Assignment(SF.IdentifierName(outputIndex), SH.Literal(numYields), SyntaxKind.AddAssignmentExpression);
+        }
+
+        public IEnumerable<StatementSyntax> GetFinalization()
+        {
+            yield return SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanExpression, SF.IdentifierName(outputIndex), SH.Literal(0)),
+                                    SF.ExpressionStatement(SF.IdentifierName(output).Dot("Append").Invoke(SF.IdentifierName(outputBuffer), SH.Literal(0), SF.IdentifierName(outputIndex))));
+            yield return SF.ReturnStatement(SF.IdentifierName(output).Dot("ToString").Invoke());
+        }
+    }
+
     class IEnumerableYieldCodeGenerator : ConcreteYieldCodeGenerator
     {
         TypeSyntax _outputType;

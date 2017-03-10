@@ -62,6 +62,14 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
                 classDecl = DoGenerate("FromArrayToStream", source, stb, classDecl, knownFunctions, arrayInputGen, streamYieldGen, commonExpressionsInTemporaries);
             }
 
+            if (source.InputTypeSymbol.SpecialType == SpecialType.System_Char && source.OutputTypeSymbol.SpecialType == SpecialType.System_Char)
+            {
+                classDecl = DoGenerate("FromStringToString", source, stb, classDecl, knownFunctions,
+                    new StringInputCodeGenerator(),
+                    new StringYieldCodeGenerator(_compilation),
+                    commonExpressionsInTemporaries);
+            }
+
             return classDecl;
         }
 

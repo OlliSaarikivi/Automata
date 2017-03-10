@@ -104,6 +104,39 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         }
     }
 
+    class StringInputCodeGenerator : ConcreteInputCodeGenerator
+    {
+        SyntaxToken inputParameter = SF.Identifier("input");
+        SyntaxToken inputIndex = SF.Identifier("iIndex");
+
+        public StringInputCodeGenerator()
+        {
+        }
+
+        public IEnumerable<ParameterSyntax> GetParameters()
+        {
+            return new[] { SF.Parameter(inputParameter).WithType(SH.PredefinedType(SyntaxKind.StringKeyword)) };
+        }
+
+        public IEnumerable<StatementSyntax> GetInitialization()
+        {
+            yield return SH.LocalDeclaration(SH.PredefinedType(SyntaxKind.IntKeyword), inputIndex, SH.Literal(-1));
+        }
+
+        public IEnumerable<StatementSyntax> GetMoveNext(StatementSyntax finalizer)
+        {
+            yield return SF.IfStatement(SF.BinaryExpression(SyntaxKind.GreaterThanOrEqualExpression,
+                    SF.PrefixUnaryExpression(SyntaxKind.PreIncrementExpression, SF.IdentifierName(inputIndex)), SF.IdentifierName(inputParameter).Dot("Length")),
+                finalizer);
+        }
+
+        public ExpressionSyntax GetInput()
+        {
+            return SF.ElementAccessExpression(SF.IdentifierName(inputParameter),
+                        SF.BracketedArgumentList(SF.SingletonSeparatedList(SF.Argument(SF.IdentifierName(inputIndex)))));
+        }
+    }
+
     class IEnumerableInputCodeGenerator : ConcreteInputCodeGenerator
     {
         TypeSyntax _inputType;
