@@ -31,6 +31,16 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             return data;
         }
 
+        public static string RandomString()
+        {
+            char[] data = new char[(MB * BenchmarkSize) / sizeof(char)];
+            for (int i = 0; i < data.Length; ++i)
+            {
+                data[i] = (char)Random.Next(char.MinValue, char.MaxValue);
+            }
+            return new string(data);
+        }
+
         public static byte[] RandomIntsAsBytes()
         {
             return Int32ToBytes.Transduce(RandomInts()).ToArray();

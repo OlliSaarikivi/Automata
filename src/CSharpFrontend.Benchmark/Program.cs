@@ -77,18 +77,31 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             if (validOutput.Length != output.Length)
             {
                 Console.WriteLine("WARNING: results lengths do not match: " + output.Length + " but should be " + validOutput.Length);
-                foreach (byte c in output)
+            }
+            else
+            {
+                for (int j = 0; j < validOutput.Length; ++j)
                 {
-                    Console.Write((int)c);
-                    Console.Write(' ');
+                    if (output[j] != validOutput[j])
+                    {
+                        Console.WriteLine("WARNING: results differ at index " + j);
+                        Console.WriteLine("Press enter to continue");
+                        Console.ReadLine();
+                    }
                 }
-                Console.WriteLine();
-                foreach (byte c in validOutput)
-                {
-                    Console.Write((int)c);
-                    Console.Write(' ');
-                }
-                Console.WriteLine();
+            }
+        }
+
+        static void ValidateStringOutput(string input, string output, Func<string, string> specification)
+        {
+            if (!CheckResults)
+                return;
+            
+            var validOutput = specification(input);
+
+            if (validOutput.Length != output.Length)
+            {
+                Console.WriteLine("WARNING: results lengths do not match: " + output.Length + " but should be " + validOutput.Length);
             }
             else
             {
@@ -181,6 +194,27 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             });
         }
 
+        static void BenchmarkString(Func<string> dataProvider, Func<string, string> function, string name, Func<string, string> specification = null)
+        {
+            IterateBenchmark(name, validate =>
+            {
+                var input = dataProvider();
+
+                // Warm up the cache
+                function(input);
+                
+                GC.Collect();
+                var sw = Stopwatch.StartNew();
+                var output = function(input);
+                sw.Stop();
+                if (specification != null && validate)
+                {
+                    ValidateStringOutput(input, output, specification);
+                }
+                return Throughput(input.Length, sw.Elapsed.TotalSeconds);
+            });
+        }
+
         static double QuickBenchmarkStream(Func<byte[]> dataProvider, Action<Stream, Stream> function)
         {
             var input = new MemoryStream(dataProvider());
@@ -223,6 +257,7 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             Func<byte[]> proteins = (() => DataProviders.SingleFile($"{datasetsDir}psd7003.xml"));
             Func<byte[]> dblp = (() => DataProviders.SingleFile($"{datasetsDir}dblp.xml"));
             Func<byte[]> mondial = (() => DataProviders.SingleFile($"{datasetsDir}mondial-3.0.xml"));
+            Func<string> randomString = (() => DataProviders.RandomString());
 
             Action<byte[], Stream> nullSpec = null;
 
@@ -342,6 +377,14 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                     (Action<byte[], Stream>)ManualXML3.HandOptimized, (Action<byte[], Stream>)ManualXML3.GeneratedStages),
                 Tuple.Create("Mondial largest population (XmlDocument)", mondial,
                     (Action<byte[], Stream>)ManualXML4.HandOptimized, (Action<byte[], Stream>)ManualXML4.GeneratedStages),
+            };
+
+            var stringBenchmarks = new List<Tuple<string, Func<string>, Func<string, string>, Func<string, string>>>
+            {
+                Tuple.Create("HTMLEncode (Fused)", randomString,
+                    (Func<string,string>)FixUTF16ToHTMLEncode.TransduceFromStringToString, (Func<string,string>)ManualFixUTF16ToHTMLEncode.HandOptimized),
+                Tuple.Create("HTMLEncode (AntiXss)", randomString,
+                    (Func<string,string>)ManualFixUTF16ToHTMLEncode.HandOptimized, (Func<string,string>)FixUTF16ToHTMLEncode.TransduceFromStringToString),
             };
 
             if (args.Length > 0 && args[0] == "-fig9WithoutConfidence")
@@ -518,11 +561,15 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                 {
                     Console.WriteLine((i + 1 + streamBenchmarks.Count) + ": " + arrayBenchmarks[i].Item1);
                 }
+                for (int i = 0; i < stringBenchmarks.Count; ++i)
+                {
+                    Console.WriteLine((i + 1 + streamBenchmarks.Count + arrayBenchmarks.Count) + ": " + stringBenchmarks[i].Item1);
+                }
                 Console.Write("Select benchmarks (comma separated), or press Enter to run all: ");
                 var answer = Console.ReadLine().Trim();
                 if (answer == "")
                 {
-                    selections = Enumerable.Range(1, streamBenchmarks.Count + arrayBenchmarks.Count).ToArray();
+                    selections = Enumerable.Range(1, streamBenchmarks.Count + arrayBenchmarks.Count + stringBenchmarks.Count).ToArray();
                 }
                 else
                 {
@@ -545,10 +592,15 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                         var benchmark = streamBenchmarks[selection - 1];
                         BenchmarkStream(benchmark.Item2, benchmark.Item3, benchmark.Item1, benchmark.Item4);
                     }
-                    else
+                    else if (selection <= streamBenchmarks.Count + arrayBenchmarks.Count)
                     {
                         var benchmark = arrayBenchmarks[selection - 1 - streamBenchmarks.Count];
                         BenchmarkArray(benchmark.Item2, benchmark.Item3, benchmark.Item1, benchmark.Item4);
+                    }
+                    else
+                    {
+                        var benchmark = stringBenchmarks[selection - 1 - streamBenchmarks.Count - arrayBenchmarks.Count];
+                        BenchmarkString(benchmark.Item2, benchmark.Item3, benchmark.Item1, benchmark.Item4);
                     }
                 }
             }

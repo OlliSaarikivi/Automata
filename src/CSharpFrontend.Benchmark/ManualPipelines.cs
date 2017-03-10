@@ -180,4 +180,12 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
             output.Write(formatted, 0, formatted.Length);
         }
     }
+
+    class ManualFixUTF16ToHTMLEncode
+    {
+        public static string HandOptimized(string input)
+        {
+            return System.Web.Security.AntiXss.AntiXssEncoder.HtmlEncode(input, false);
+        }
+    }
 }
