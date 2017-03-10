@@ -7,6 +7,124 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Automata.CSharpFrontend.Benchmark
 {
+    partial class HTMLEncode : Transducer<char, char>
+    {
+        char CP(char h, char l) { return (char)((((h & 0x3FF) + 0x40) << 10) | (l & 0x3FF)); }
+        char D5(char x) { return (char)((((x / 100) / 1000) % 10) + '0'); }
+        char D4(char x) { return (char)(((x / 10000) % 10) + '0'); }
+        char D3(char x) { return (char)(((x / 1000) % 10) + '0'); }
+        char D2(char x) { return (char)(((x / 100) % 10) + '0'); }
+        char D1(char x) { return (char)(((x / 10) % 10) + '0'); }
+        char D0(char x) { return (char)((x % 10) + '0'); }
+
+        char prev = '\0';
+
+        bool s0 = false;
+        bool s1 = false;
+        bool s2 = false;
+
+        public override IEnumerable<char> Update(char c)
+        {
+            if (!s2 & !s1 & !s0) {
+                if ((c == '\x20') ||
+                    (c == '\x21') ||
+                    ('\x23' <= c && c <= '\x25') ||
+                    ('\x28' <= c && c <= '\x3B') ||
+                    (c == '\x3D') ||
+                    ('\x3F' <= c && c <= '\x7E') ||
+                    ('\xA1' <= c && c <= '\xAC') ||
+                    ('\xAE' <= c && c <= '\u036F')) {
+                    yield return c;
+                }
+                else if (c == '<') {
+                    yield return '&'; yield return 'l'; yield return 't'; yield return ';';
+                }
+                else if (c == '>') {
+                    yield return '&'; yield return 'g'; yield return 't'; yield return ';';
+                }
+                else if (c == '&') {
+                    yield return '&'; yield return 'a'; yield return 'm'; yield return 'p'; yield return ';';
+                }
+                else if (c == '\"') {
+                    yield return '&'; yield return 'q'; yield return 'u'; yield return 'o'; yield return 't'; yield return ';';
+                }
+                else if ('\0' <= c && c <= '\x09') {
+                    yield return '&'; yield return '#'; yield return D0(c); yield return ';';
+                }
+                else if ('\x0A' <= c && c <= '\x63') {
+                    yield return '&'; yield return '#'; yield return D1(c); yield return D0(c); yield return ';';
+                }
+                else if ('\x64' <= c && c <= '\u03E7') {
+                    yield return '&'; yield return '#'; yield return D2(c); yield return D1(c); yield return D0(c); yield return ';';
+                }
+                else if ('\u03E8' <= c && c <= '\u270F') {
+                    yield return '&'; yield return '#'; yield return D3(c); yield return D2(c); yield return D1(c); yield return D0(c); yield return ';';
+                }
+                else if (('\u2710' <= c && c <= '\uD7FF') || ('\uE000' <= c && c <= '\uFFFF')) {
+                    yield return '&'; yield return '#'; yield return D4(c); yield return D3(c); yield return D2(c); yield return D1(c); yield return D0(c); yield return ';';
+                }
+                else if ('\uD800' <= c && c <= '\uD820') {
+                    prev = c;
+                    s2 = false; s1 = false; s0 = true;
+                }
+                else if (\uD821) {
+                    prev = c;
+                    s2 = false; s1 = true; s0 = false;
+                }
+                else if (\uD821) {
+                    prev = c;
+                    s2 = false; s1 = true; s0 = false;
+                }
+                else if ('\uD822' <= c && c <= '\uDB8F') {
+                    prev = c;
+                    s2 = false; s1 = true; s0 = true;
+                }
+                else if (\uDB90) {
+                    prev = c;
+                    s2 = true; s1 = false; s0 = false;
+                }
+                else if (\uDB90) {
+                    prev = c;
+                    s2 = true; s1 = false; s0 = false;
+                }
+                else if ('\uDB91' <= c && c <= '\uDBFF') {
+                    prev = c;
+                    s2 = true; s1 = false; s0 = true;
+                }
+                else throw new Exception();
+            } else if (!s2 & !s1 & s0) {
+                s2 = false; s1 = false; s0 = false;
+                if ('\uDC00' <= c && c <= '\uDFFF') {
+                    yield return '&'; yield return '#'; yield return D4(CP(prev,c)); yield return D3(CP(prev,c)); yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else throw new Exception();
+            } else if (!s2 & s1 & !s0) {
+                s2 = false; s1 = false; s0 = false;
+                if ('\uDC00' <= c && c <= '\uDE9F') {
+                    yield return '&'; yield return '#'; yield return D4(CP(prev,c)); yield return D3(CP(prev,c)); yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else if ('\uDEA0' <= c && c <= '\uDFFF') {
+                    yield return '&'; yield return '#'; yield return '1'; yield return '0'; yield return '0'; yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else throw new Exception();
+            } else if (!s2 & s1 & s0) {
+                s2 = false; s1 = false; s0 = false;
+                if ('\uDC00' <= c && c <= '\uDFFF') {
+                    yield return '&'; yield return '#'; yield return D5(CP(prev,c)); yield return D4(CP(prev,c)); yield return D3(CP(prev,c)); yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else throw new Exception();
+            } else if (s2 & !s1 & !s0) {
+                s2 = false; s1 = false; s0 = false;
+                if ('\uDC00' <= c && c <= '\uDE3F') {
+                    yield return '&'; yield return '#'; yield return D5(CP(prev,c)); yield return D4(CP(prev,c)); yield return D3(CP(prev,c)); yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else if ('\uDE40' <= c && c <= '\uDFFF') {
+                    yield return '&'; yield return '#'; yield return '1'; yield return '0'; yield return '0'; yield return '0'; yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else throw new Exception();
+            } else if (s2 & !s1 & s0) {
+                s2 = false; s1 = false; s0 = false;
+                if ('\uDC00' <= c && c <= '\uDFFF') {
+                    yield return '&'; yield return '#'; yield return '1'; yield return D5(CP(prev,c)); yield return D4(CP(prev,c)); yield return D3(CP(prev,c)); yield return D2(CP(prev,c)); yield return D1(CP(prev,c)); yield return D0(CP(prev,c)); yield return ';';
+                } else throw new Exception();
+            }
+        }
+    }
+    
     partial class HTMLDecode : Transducer<char, char>
     {
         char F(char x, char y)
