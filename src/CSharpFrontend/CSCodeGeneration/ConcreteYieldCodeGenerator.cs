@@ -117,7 +117,8 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
         public IEnumerable<StatementSyntax> GetInitialization()
         {
             yield return SH.LocalDeclaration(SF.IdentifierName("var"), output,
-                SF.ObjectCreationExpression(_stringBuilder.CreateSyntax()));
+                SF.ObjectCreationExpression(_stringBuilder.CreateSyntax())
+                    .WithArgumentList(SF.ArgumentList(SF.SeparatedList<ArgumentSyntax>())));
             var bufferType = SF.ArrayType(SH.PredefinedType(SyntaxKind.CharKeyword),
                 SF.SingletonList(SF.ArrayRankSpecifier(SF.SingletonSeparatedList((ExpressionSyntax)SH.Literal(BufferSize)))));
             yield return SH.LocalDeclaration(SF.IdentifierName("var"), outputBuffer,
