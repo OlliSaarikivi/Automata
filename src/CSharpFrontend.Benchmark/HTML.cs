@@ -67,11 +67,11 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                     prev = c;
                     s2 = false; s1 = false; s0 = true;
                 }
-                else if (\uD821) {
+                else if (c == '\uD821') {
                     prev = c;
                     s2 = false; s1 = true; s0 = false;
                 }
-                else if (\uD821) {
+                else if (c == '\uD821') {
                     prev = c;
                     s2 = false; s1 = true; s0 = false;
                 }
@@ -79,11 +79,11 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
                     prev = c;
                     s2 = false; s1 = true; s0 = true;
                 }
-                else if (\uDB90) {
+                else if (c == '\uDB90') {
                     prev = c;
                     s2 = true; s1 = false; s0 = false;
                 }
-                else if (\uDB90) {
+                else if (c == '\uDB90') {
                     prev = c;
                     s2 = true; s1 = false; s0 = false;
                 }

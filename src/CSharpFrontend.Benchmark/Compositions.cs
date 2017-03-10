@@ -126,6 +126,8 @@ namespace Microsoft.Automata.CSharpFrontend.Benchmark
     partial class XML4abc : Composition<XML4ab, Int32ToBytes> { }
 
 
+    partial class FixUTF16ToHTMLEncode : Composition<UTF16FixSurrogates, HTMLEncode> { }
+
 
     // Windowed average length of issue description
     // The following is currently broken by the compiler
