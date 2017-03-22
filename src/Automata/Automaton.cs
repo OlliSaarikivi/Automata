@@ -4300,6 +4300,18 @@ namespace Microsoft.Automata
             }
         }
 
+        public int GetRepresentative(Func<HashSet<int>, int> chooser)
+        {
+            if (reprChosen)
+                return representative;
+            else
+            {
+                representative = chooser(set);
+                reprChosen = true;
+                return representative;
+            }
+        }
+
         internal bool Add(int item)
         {
             return set.Add(item);

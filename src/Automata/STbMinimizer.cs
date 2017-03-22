@@ -19,6 +19,33 @@ namespace Microsoft.Automata
             this.st = stb.ToST();
         }
 
+        static string DummyVarMapping(TERM t)
+        {
+            return "x";
+        }
+
+        static double TermSize(TERM t, IContext<FUNC, TERM, SORT> s)
+        {
+            return s.PrettyPrintCS(t, DummyVarMapping).Length;
+        }
+
+        static double WeightedRuleSize(STbRule<TERM> r, IContext<FUNC,TERM,SORT> s)
+        {
+            switch (r.RuleKind)
+            {
+                case STbRuleKind.Undef:
+                    return 0;
+                case STbRuleKind.Base:
+                    return r.Yields.Sum(x => TermSize(x, s)) + TermSize(r.Register, s);
+                case STbRuleKind.Ite:
+                    var t = WeightedRuleSize(r.TrueCase, s);
+                    var f = WeightedRuleSize(r.FalseCase, s);
+                    return TermSize(r.Condition, s)
+                        + ((t + f) / 2); // Equal probability for branches is assumed
+                default:
+                    throw new NotImplementedException();
+            }
+        }
 
         public STb<FUNC, TERM, SORT> Minimize()
         {
@@ -108,9 +135,14 @@ namespace Microsoft.Automata
             var minimized = new STb<FUNC, TERM, SORT>(stb.Solver, stb.Name + "_min", stb.InputSort, stb.OutputSort, stb.RegisterSort, stb.InitialRegister,
                 blocks[stb.InitialState].GetRepresentative());
             var representatives = new HashSet<int>();
+            var weightedRuleSizes = stb.States.ToDictionary(x => x, x => WeightedRuleSize(stb.GetRuleFrom(x), s));
             foreach (var state in stb.States)
             {
-                representatives.Add(blocks[state].GetRepresentative());
+                representatives.Add(blocks[state].GetRepresentative((set) =>
+                    (from candidate in set
+                     orderby weightedRuleSizes[candidate] ascending
+                     select candidate).First()
+                ));
             }
             foreach (var state in representatives)
             {
