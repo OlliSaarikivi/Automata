@@ -225,7 +225,7 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
 
             var moveBlocks = new List<StatementSyntax>();
             var finalizeBlocks = new List<StatementSyntax>();
-            foreach (var state in stb.States)
+            foreach (var state in OptimizedStateOrder(stb))
             {
                 StatementSyntax finalizeBlock;
                 if (stb.IsFinalState(state))
@@ -252,6 +252,52 @@ namespace Microsoft.Automata.CSharpFrontend.CodeGeneration
 
             members.Add(transduceDecl.WithBody(SF.Block(SF.CheckedStatement(SyntaxKind.UncheckedStatement, body))));
             return classDecl.AddMembers(members.ToArray());
+        }
+
+        IEnumerable<int> OptimizedStateOrder(STb<FuncDecl, Expr, Sort> stb)
+        {
+            var visitedStates = new HashSet<int>();
+            var workStack = new Stack<int>();
+
+            yield return stb.InitialState;
+            visitedStates.Add(stb.InitialState);
+            workStack.Push(stb.InitialState);
+
+            while (workStack.Count > 0)
+            {
+                foreach (var child in BreadthFirstStates(stb.GetRuleFrom(workStack.Peek())))
+                {
+                    if (visitedStates.Add(child))
+                    {
+                        yield return child;
+                        workStack.Push(child);
+                        goto DESCEND;
+                    }
+                }
+                workStack.Pop();
+                DESCEND:;
+            }
+        }
+
+        IEnumerable<int> BreadthFirstStates(STbRule<Expr> root)
+        {
+            var workQueue = new Queue<STbRule<Expr>>();
+            workQueue.Enqueue(root);
+
+            while (workQueue.Count > 0)
+            {
+                var rule = workQueue.Dequeue();
+                switch (rule.RuleKind)
+                {
+                    case STbRuleKind.Ite:
+                        workQueue.Enqueue(rule.TrueCase);
+                        workQueue.Enqueue(rule.FalseCase);
+                        break;
+                    case STbRuleKind.Base:
+                        yield return rule.State;
+                        break;
+                }
+            }
         }
 
         IEnumerable<StatementSyntax> GenerateUpdate(Expr term, Dictionary<Expr, ExpressionSyntax> variables, TransducerCompilation source, STb<FuncDecl, Expr, Sort> stb, Action<MemberDeclarationSyntax> addMember, Dictionary<Sort, TypeSyntax> datatypeSyntaxes,
