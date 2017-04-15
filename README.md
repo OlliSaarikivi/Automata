@@ -7,11 +7,6 @@ This branch includes the benchmarks described in the paper:
 
 Olli Saarikivi, Margus Veanes, Todd Mytkowicz and Madan Musuvathi. Fusing Effectful Comprehensions. In *Proceedings of the 38th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI'17)*. ACM, 2017.
 
-To get started unpack the archive. The tool and benchmarks have been verified to work with:
-
-- Windows 10
-- .NET Framework 4.6
-
 This repository uses [Git LFS](https://git-lfs.github.com/) for storing the large `datasets.zip` file.
 
 ## Running the benchmarks
@@ -29,7 +24,7 @@ For each benchmark a sufficient number of runs is measured until a 0.5 MB/s conf
 
 To quickly produce CSV files matching figures 9 and 10 in the paper run the scripts `<root>/RunFigure9QuickCSV.bat` and `<root>/RunFigure10QuickCSV.bat` . These scripts use single runs of the benchmarks and therefore don't guarantee a confidence interval.
 
-\section{Modifying the benchmarks}
+## Modifying the benchmarks
 
 To get started with modifying the benchmarks open the `<root>/Main.sln` solution in Visual Studio 2015. The benchmarks are found in the `CSharpFrontend.Benchmark` project. Some source files of interest are:
 
