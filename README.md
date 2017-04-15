@@ -9,30 +9,35 @@ Olli Saarikivi, Margus Veanes, Todd Mytkowicz and Madan Musuvathi. Fusing Effect
 
 To get started unpack the archive. The tool and benchmarks have been verified to work with:
 
--Windows 10
--.NET Framework 4.6
+- Windows 10
+- .NET Framework 4.6
+
+This repository uses [Git LFS](https://git-lfs.github.com/) for storing the large `datasets.zip` file.
 
 ## Running the benchmarks
 
 The `Main.sln` solution builds an executable containing all the benchmarks. To run this executable:
 
-1. Run the native image generator (NGen) in the root folder with the command: `<ngen> install bin/Release/CSharpFrontend.Benchmark.exe` . NGen can be found in the .NET framework, typically under a path like `C:\Windows\Microsoft.NET\Framework\<latest version>\ngen.exe` . This step is necessary to replicate the test setup in the paper's evaluation.
-2. Run the `<root>/RunBenchmarks.bat` batch script, which will invoke the benchmark executable.
+1. Unpack `datasets.zip` .
+2. Run the native image generator (NGen) in the root folder with the command: `<ngen> install bin/Release/CSharpFrontend.Benchmark.exe` . NGen can be found in the .NET framework, typically under a path like `C:\Windows\Microsoft.NET\Framework\<latest version>\ngen.exe` . This step is necessary to replicate the test setup in the paper's evaluation.
+3. Run the `<root>/RunBenchmarks.bat` batch script, which will invoke the benchmark executable.
 \end{enumerate}
 
 The benchmark program offers a choice of benchmarks to run (as a comma separated list of benchmark numbers), or one can run all benchmarks just by pressing enter. Note that benchmark number 62 is expected to crash with an OutOfMemoryException (as was reported in the paper).
 
 For each benchmark a sufficient number of runs is measured until a 0.5 MB/s confidence interval at a 95\% confidence level has been achieved. The measurements for each benchmark are written to a separate timestamped file in `<root>/results/` .
 
+To quickly produce CSV files matching figures 9 and 10 in the paper run the scripts `<root>/RunFigure9QuickCSV.bat` and `<root>/RunFigure10QuickCSV.bat` . These scripts use single runs of the benchmarks and therefore don't guarantee a confidence interval.
+
 \section{Modifying the benchmarks}
 
 To get started with modifying the benchmarks open the `<root>/Main.sln` solution in Visual Studio 2015. The benchmarks are found in the `CSharpFrontend.Benchmark` project. Some source files of interest are:
 
--`Program.cs` includes the benchmarking framework as well as all the benchmark selection entry definitions.
--`Compositions.cs` defines the pipelines of transducers.
--`HandFused/All.cs` includes pipelines that have been composed with the method call fusion approach. These fusions do not currently have a code generator to produce them and have been produced by hand.
--`Manual*.cs` include the hand written pipelines that we compare against.
--`gen/*.cs` are generated source code for all pipelines in the project (that do not have the `[SuppressCodeGeneration()]` attribute).
+- `Program.cs` includes the benchmarking framework as well as all the benchmark selection entry definitions.
+- `Compositions.cs` defines the pipelines of transducers.
+- `HandFused/All.cs` includes pipelines that have been composed with the method call fusion approach. These fusions do not currently have a code generator to produce them and have been produced by hand.
+- `Manual*.cs` include the hand written pipelines that we compare against.
+- `gen/*.cs` are generated source code for all pipelines in the project (that do not have the `[SuppressCodeGeneration()]` attribute).
 
 Fusions of transducers are specified by extending `Composition<TInner, TOuter>`. No members for the class have to be defined, as the code generation will produce functions implementing the transduction in a separate file (note that the class must be declared `partial` to support the code generation).
 
