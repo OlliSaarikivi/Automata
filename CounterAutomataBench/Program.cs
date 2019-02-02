@@ -37,13 +37,13 @@ namespace CounterAutomataBench
             }
         }
 
-        public void WriteCSV(string path)
+        public void WriteTSV(string path)
         {
             Validate();
 
             using (var fout = new StreamWriter(new FileStream(path, FileMode.CreateNew)))
             {
-                Func<string, string, string> csvJoin = (l, r) => $"{l},{r}";
+                Func<string, string, string> csvJoin = (l, r) => $"{l}\t{r}";
 
                 fout.WriteLine(header.Aggregate(csvJoin));
 
@@ -86,7 +86,7 @@ namespace CounterAutomataBench
             
             foreach (var regex in regexes)
             {
-                stats.Add("pattern", $"\"{regex}\"");
+                stats.Add("pattern", regex);
             }
 
             // Our pipeline
@@ -203,8 +203,8 @@ namespace CounterAutomataBench
                 Console.WriteLine("All regexes passed filter.");
             }
             var stats = Benchmark(filtered);
-            var outPath = $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid()}.csv";
-            stats.WriteCSV(outPath);
+            var outPath = $"{Path.GetFileNameWithoutExtension(path)}-results-{Guid.NewGuid()}.txt";
+            stats.WriteTSV(outPath);
         }
 
         static void Main(string[] args)
