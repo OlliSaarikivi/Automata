@@ -285,8 +285,8 @@ namespace Automata.Tests
         [TestMethod]
         public void GenerateExamplesWithLoops()
         {
-            GenerateExamplesWithLoops("../../../../Automata.Tests/Samples_/regexesWithoutAnchors.txt", "Set1", true);
-            //GenerateExamplesWithLoops("../../../../Automata.Tests/Samples/regexes.txt", "Set2", true);
+            //GenerateExamplesWithLoops("../../../../Automata.Tests/Samples_/regexesWithoutAnchors.txt", "Set1", true);
+            GenerateExamplesWithLoops("../../../../Automata.Tests/Samples/regexes.txt", "Set2", true);
         }
 
         void GenerateExamplesWithLoops(string file, string batch_name, bool simplify)

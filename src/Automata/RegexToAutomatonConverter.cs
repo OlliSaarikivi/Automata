@@ -44,7 +44,7 @@ namespace Microsoft.Automata
         /// </summary>
         /// <param name="solver">solver for character constraints</param>
         /// <param name="categorizer">maps unicode categories to corresponding character conditions</param>
-        internal RegexToAutomatonConverter(ICharAlgebra<S> solver, IUnicodeCategoryTheory<S> categorizer = null)
+        public RegexToAutomatonConverter(ICharAlgebra<S> solver, IUnicodeCategoryTheory<S> categorizer = null)
         {
             this.solver = solver;
             this.categorizer = (categorizer == null ? new UnicodeCategoryTheory<S>(solver) : categorizer);

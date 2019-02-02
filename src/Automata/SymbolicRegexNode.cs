@@ -26,12 +26,12 @@ namespace Microsoft.Automata
     public class SymbolicRegexNode<S> : ICounter
     {
         internal SymbolicRegexBuilder<S> builder;
-        internal SymbolicRegexKind kind;
+        public SymbolicRegexKind kind;
         internal int lower = -1;
         internal int upper = -1;
         internal S set = default(S);
 
-        internal SymbolicRegexNode<S> left = null;
+        public SymbolicRegexNode<S> left = null;
         internal SymbolicRegexNode<S> right = null;
         internal SymbolicRegexNode<S> iteCond = null;
 
@@ -689,7 +689,7 @@ namespace Microsoft.Automata
         /// Temporary counter automaton exploration untility
         /// </summary>
         /// <returns></returns>
-        internal Automaton<Tuple<Maybe<S>,Sequence<CounterUpdate>>> Explore()
+        public Automaton<Tuple<Maybe<S>,Sequence<CounterUpdate>>> Explore()
         {
             var stateLookup = new Dictionary<SymbolicRegexNode<S>, int>();
             var regexLookup = new Dictionary<int,SymbolicRegexNode<S>>();

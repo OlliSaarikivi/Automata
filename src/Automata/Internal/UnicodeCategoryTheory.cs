@@ -10,7 +10,7 @@ namespace Microsoft.Automata
     /// Maps unicode categories to correspoing character predicates.
     /// </summary>
     /// <typeparam name="PRED">predicates</typeparam>
-    internal interface IUnicodeCategoryTheory<PRED>
+    public interface IUnicodeCategoryTheory<PRED>
     {
         /// <summary>
         /// Gets the unicode category condition for unicode category cat, that must be an integer between 0 and 29
