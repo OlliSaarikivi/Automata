@@ -2961,7 +2961,7 @@ namespace Microsoft.Automata
         /// Minimization of SFAs.
         /// Can also be applied to nondeterministic SFAs.
         /// </summary>
-        public Automaton<T> Minimize()
+        public Automaton<T> Minimize(int timeout = 0)
         {
             if (IsEmpty)
             {
@@ -2982,7 +2982,7 @@ namespace Microsoft.Automata
             }
             else
             {
-                return MinSFANew(fa);
+                return MinSFANew(fa, timeout);
                 //var fa_m = MinSFA(fa);
                 //if (fa_m.StateCount < fa.StateCount)
                 //{
@@ -3006,8 +3006,15 @@ namespace Microsoft.Automata
         /// <summary>
         /// Algorithm MinSFA from POPL14.
         /// </summary>
-        static Automaton<T> MinSFANew(Automaton<T> autom)
+        static Automaton<T> MinSFANew(Automaton<T> autom, int timeout = 0)
         {
+            long timeout1 = Microsoft.Automata.Utilities.HighTimer.Frequency * ((long)timeout / (long)1000);
+            long timeoutLimit;
+            if (timeout > 0)
+                timeoutLimit = Utilities.HighTimer.Now + timeout1;
+            else
+                timeoutLimit = 0;
+
             totalExploredBlocks = 0;
             var solver = autom.algebra;
             var fa = autom.MakeTotal();
@@ -3105,6 +3112,7 @@ namespace Microsoft.Automata
                      
             while (!W.IsEmpty)
             {
+                CheckTimeout(timeoutLimit);
                 totalExploredBlocks++;
              
                 var B = W.Pop();

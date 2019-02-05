@@ -24,8 +24,6 @@ namespace CounterAutomataBench
             }
             column.Add(value);
         }
-        public void Add(string name, double value) => Add(name, value.ToString());
-        public void Add(string name, int value) => Add(name, value.ToString());
 
         public void Validate()
         {
@@ -95,19 +93,19 @@ namespace CounterAutomataBench
         }
     }
 
-    class Exact : Stat
+    class Exact<T> : Stat where T : struct, IEquatable<T>
     {
-        int? value;
+        T? value;
 
         public Exact(Stats stats, string name) : base(stats, name)
         {
         }
 
-        public void Add(int newValue)
+        public void Add(T newValue)
         {
             if (value != null)
             {
-                Debug.Assert(newValue == value);
+                Debug.Assert(newValue.Equals(value.Value));
             }
             value = newValue;
         }
@@ -121,6 +119,7 @@ namespace CounterAutomataBench
     class Program
     {
         const int SAMPLES = 10;
+        const int TIMEOUT = 60000;
 
         static IEnumerable<string> ReadRegexes(string path)
         {
@@ -164,7 +163,7 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
-                    using (var ncaSize = new Exact(stats, "|NCA|"))
+                    using (var ncaSize = new Exact<int>(stats, "|NCA|"))
                     using (var srToNCA = new HotAverage(stats, "SR->NCA (milliseconds)"))
                     using (var regexToSR = new HotAverage(stats, "regex->SR (milliseconds)"))
                         for (int i = 0; i <= SAMPLES; ++i)
@@ -199,30 +198,40 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
-                    using (var minSize = new HotAverage(stats, "|min|"))
-                    using (var dfaSize = new HotAverage(stats, "|DFA|"))
-                    using (var nfaSize = new HotAverage(stats, "|NFA|"))
+                    using (var timedOut = new Exact<bool>(stats, "Classical timeout"))
+                    using (var minSize = new Exact<int>(stats, "|min|"))
+                    using (var dfaSize = new Exact<int>(stats, "|DFA|"))
+                    using (var nfaSize = new Exact<int>(stats, "|NFA|"))
                     using (var dfaToMin = new HotAverage(stats, "DFA->min (milliseconds)"))
                     using (var nfaToDfa = new HotAverage(stats, "NFA->DFA (milliseconds)"))
                     using (var regexToNfa = new HotAverage(stats, "regex->NFA (milliseconds)"))
-                        for (int i = 0; i <= SAMPLES; ++i)
+                    {
+                        try
                         {
-                            sw.Restart();
-                            var nfa = regexConverter.Convert(regex);
-                            regexToNfa.Add(sw.Elapsed.TotalMilliseconds);
+                            for (int i = 0; i <= SAMPLES; ++i)
+                            {
+                                sw.Restart();
+                                var nfa = regexConverter.Convert(regex);
+                                regexToNfa.Add(sw.Elapsed.TotalMilliseconds);
+                                nfaSize.Add(nfa.StateCount);
+                                
+                                sw.Restart();
+                                var dfa = nfa.Determinize(TIMEOUT);
+                                nfaToDfa.Add(sw.Elapsed.TotalMilliseconds);
+                                dfaSize.Add(dfa.StateCount);
 
-                            sw.Restart();
-                            var dfa = nfa.Determinize();
-                            nfaToDfa.Add(sw.Elapsed.TotalMilliseconds);
-
-                            sw.Restart();
-                            var min = dfa.Minimize();
-                            dfaToMin.Add(sw.Elapsed.TotalMilliseconds);
-
-                            nfaSize.Add(nfa.StateCount);
-                            dfaSize.Add(dfa.StateCount);
-                            minSize.Add(min.StateCount);
+                                sw.Restart();
+                                var min = dfa.Minimize(TIMEOUT);
+                                dfaToMin.Add(sw.Elapsed.TotalMilliseconds);
+                                minSize.Add(min.StateCount);
+                            }
+                            timedOut.Add(false);
                         }
+                        catch (TimeoutException)
+                        {
+                            timedOut.Add(true);
+                        }
+                    }
                 }
             }
 
@@ -252,16 +261,23 @@ namespace CounterAutomataBench
 
             foreach (var regex in regexes)
             {
-                var sr = new Regex(regex, RegexOptions.Singleline);
-                SymbolicRegexUInt64 m = null;
-                string reasonwhynot;
-                if (sr.IsCompileSupported(out reasonwhynot))
+                try
                 {
-                    m = sr.Compile(false, false) as SymbolicRegexUInt64;
-                    if (m.Pattern.ExistsNode(isCountingLoop) && !m.Pattern.ExistsNode(isNonMonadic))
+                    var sr = new Regex(regex, RegexOptions.Singleline);
+                    SymbolicRegexUInt64 m = null;
+                    string reasonwhynot;
+                    if (sr.IsCompileSupported(out reasonwhynot))
                     {
-                        filtered.Add(regex);
+                        m = sr.Compile(false, false) as SymbolicRegexUInt64;
+                        if (m.Pattern.ExistsNode(isCountingLoop) && !m.Pattern.ExistsNode(isNonMonadic))
+                        {
+                            filtered.Add(regex);
+                        }
                     }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"While processing {regex}", e);
                 }
             }
 
@@ -293,12 +309,15 @@ namespace CounterAutomataBench
 
         static void Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length == 0)
             {
-                Console.Error.WriteLine("Usage: CounterAutomataBench.exe <path-to-regexes-file>");
+                Console.Error.WriteLine("Usage: CounterAutomataBench.exe <regexes-file1> [<regexes-file2> ...]");
                 System.Environment.Exit(1);
             }
-            BenchmarkFile(args[0]);
+            foreach (var arg in args)
+            {
+                BenchmarkFile(arg);
+            }
         }
     }
 }
