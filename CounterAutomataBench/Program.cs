@@ -56,8 +56,72 @@ namespace CounterAutomataBench
         }
     }
 
+    class Stat : IDisposable
+    {
+        Stats stats;
+        String name;
+
+        public Stat(Stats stats, string name)
+        {
+            this.stats = stats;
+            this.name = name;
+        }
+
+        public void Dispose()
+        {
+            stats.Add(name, this.ToString());
+        }
+    }
+
+    class HotAverage : Stat
+    {
+        int count = 0;
+        double sum = 0;
+
+        public HotAverage(Stats stats, string name) : base(stats, name)
+        {
+        }
+
+        public void Add(double value)
+        {
+            if (count > 0)
+                sum += value;
+            count += 1;
+        }
+
+        public override string ToString()
+        {
+            return (sum / (count - 1)).ToString();
+        }
+    }
+
+    class Exact : Stat
+    {
+        int? value;
+
+        public Exact(Stats stats, string name) : base(stats, name)
+        {
+        }
+
+        public void Add(int newValue)
+        {
+            if (value != null)
+            {
+                Debug.Assert(newValue == value);
+            }
+            value = newValue;
+        }
+
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
+
     class Program
     {
+        const int SAMPLES = 10;
+
         static IEnumerable<string> ReadRegexes(string path)
         {
             using (var fin = new StreamReader(new FileStream(path, FileMode.Open)))
@@ -80,16 +144,17 @@ namespace CounterAutomataBench
             }
         }
 
-        static Stats Benchmark(string[] regexes)
+        static Stats Benchmark(string[] regexes, bool runOur = true, bool runClassical = true)
         {
             var stats = new Stats();
-            
+
             foreach (var regex in regexes)
             {
                 stats.Add("pattern", regex);
             }
 
             // Our pipeline
+            if (runOur)
             {
                 Console.WriteLine("Our pipeline");
                 int count = 0;
@@ -99,22 +164,29 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
-                    sw.Restart();
-                    var sr = ((SymbolicRegex<ulong>)new Regex(regex, RegexOptions.Singleline).Compile(true, false)).Pattern;
-                    stats.Add("regex->SR (milliseconds)", sw.Elapsed.TotalMilliseconds);
+                    using (var ncaSize = new Exact(stats, "|NCA|"))
+                    using (var srToNCA = new HotAverage(stats, "SR->NCA (milliseconds)"))
+                    using (var regexToSR = new HotAverage(stats, "regex->SR (milliseconds)"))
+                        for (int i = 0; i <= SAMPLES; ++i)
+                        {
+                            sw.Restart();
+                            var sr = ((SymbolicRegex<ulong>)new Regex(regex, RegexOptions.Singleline).Compile(true, false)).Pattern;
+                            regexToSR.Add(sw.Elapsed.TotalMilliseconds);
 
-                    sw.Restart();
-                    var nca = sr.Explore();
-                    stats.Add("SR->NCA (milliseconds)", sw.Elapsed.TotalMilliseconds);
+                            sw.Restart();
+                            var nca = sr.Explore();
+                            srToNCA.Add(sw.Elapsed.TotalMilliseconds);
 
-                    // TODO: add NCA->DCA benchmark
+                            // TODO: add NCA->DCA benchmark
 
-                    stats.Add("|NCA|", nca.StateCount);
-                    // TODO: add number of counters in DCA form
+                            ncaSize.Add(nca.StateCount);
+                            // TODO: add number of counters in DCA form
+                        }
                 }
             }
 
             // Classical pipeline
+            if (runClassical)
             {
                 Console.WriteLine("Classical pipeline");
                 var solver = new CharSetSolver();
@@ -127,21 +199,30 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
-                    sw.Restart();
-                    var nfa = regexConverter.Convert(regex);
-                    stats.Add("regex->NFA (milliseconds)", sw.Elapsed.TotalMilliseconds);
+                    using (var minSize = new HotAverage(stats, "|min|"))
+                    using (var dfaSize = new HotAverage(stats, "|DFA|"))
+                    using (var nfaSize = new HotAverage(stats, "|NFA|"))
+                    using (var dfaToMin = new HotAverage(stats, "DFA->min (milliseconds)"))
+                    using (var nfaToDfa = new HotAverage(stats, "NFA->DFA (milliseconds)"))
+                    using (var regexToNfa = new HotAverage(stats, "regex->NFA (milliseconds)"))
+                        for (int i = 0; i <= SAMPLES; ++i)
+                        {
+                            sw.Restart();
+                            var nfa = regexConverter.Convert(regex);
+                            regexToNfa.Add(sw.Elapsed.TotalMilliseconds);
 
-                    sw.Restart();
-                    var dfa = nfa.Determinize();
-                    stats.Add("NFA->DFA (milliseconds)", sw.Elapsed.TotalMilliseconds);
+                            sw.Restart();
+                            var dfa = nfa.Determinize();
+                            nfaToDfa.Add(sw.Elapsed.TotalMilliseconds);
 
-                    sw.Restart();
-                    var min = dfa.Minimize();
-                    stats.Add("DFA->min (milliseconds)", sw.Elapsed.TotalMilliseconds);
+                            sw.Restart();
+                            var min = dfa.Minimize();
+                            dfaToMin.Add(sw.Elapsed.TotalMilliseconds);
 
-                    stats.Add("|NFA|", nfa.StateCount);
-                    stats.Add("|DFA|", dfa.StateCount);
-                    stats.Add("|min|", min.StateCount);
+                            nfaSize.Add(nfa.StateCount);
+                            dfaSize.Add(dfa.StateCount);
+                            minSize.Add(min.StateCount);
+                        }
                 }
             }
 
@@ -191,10 +272,11 @@ namespace CounterAutomataBench
         {
             var regexes = ReadRegexes(path).ToArray();
             var filtered = FilterRegexes(regexes);
+            var filenameNoExtension = Path.GetFileNameWithoutExtension(path);
             if (filtered.Length < regexes.Length)
             {
                 Console.WriteLine($"{filtered.Length}/{regexes.Length} regexes passed filter.");
-                var filteredPath = $"{Path.GetFileNameWithoutExtension(path)}-filtered.txt";
+                var filteredPath = $"{filenameNoExtension}-filtered.txt";
                 Console.WriteLine($"Writing filtered set to {Path.GetFullPath(filteredPath)}");
                 WriteRegexes(filteredPath, filtered);
             }
@@ -202,7 +284,9 @@ namespace CounterAutomataBench
             {
                 Console.WriteLine("All regexes passed filter.");
             }
-            var stats = Benchmark(filtered);
+            var stats = Benchmark(filtered,
+                runOur: !filenameNoExtension.Contains("NoCadet"),
+                runClassical: !filenameNoExtension.Contains("NoClassical"));
             var outPath = $"{Path.GetFileNameWithoutExtension(path)}-results-{Guid.NewGuid()}.txt";
             stats.WriteTSV(outPath);
         }
