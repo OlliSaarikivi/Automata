@@ -2712,19 +2712,20 @@ namespace Microsoft.Automata
             mapCounter = new Dictionary<int, int>();
             //  iterate through all states
             zeroStates = new List<int>();
+            var counters = 0;
             foreach (var s in states)
             {
                 // get all outgoing transitions
                 List<Move<T>> out_trans = this.GetMovesFrom(s).ToList();
                 if (this.IsZeroState(out_trans))
                     zeroStates.Add(s);
+                int lowerBound = -1;
+                int upperBound = -1;
+                int cnt = -1;
                 foreach (var tr in out_trans)
                 {
                     var lab = this.GetGuard(tr.Label);
                     var symbol = this.GetSymbol(tr.Label);
-                    int cnt = 0;
-                    int lowerBound = -1;
-                    int upperBound = -1;
                     if (lab != "")  // there is a counter guard
                     {
                         cnt = this.GetCounterNumber(lab);         // get counter number
@@ -2732,14 +2733,19 @@ namespace Microsoft.Automata
                             upperBound = this.GetCounterBound(lab);    // map counter to its upper bound
                         else if (this.IsEqual(lab))
                             lowerBound = this.GetCounterBound(lab);
-                        if (tr.SourceState == tr.TargetState)
-                            mapCounter[s] = cnt;                          // map state to counter
                     }
-                    if (lowerBound != -1)
-                        mapLowerBound[cnt] = lowerBound;
-                    if (upperBound != -1)
-                        mapUpperBound[cnt] = upperBound;
                 }
+                if (mapCounter.ContainsValue(cnt))
+                    cnt = counters + 1;              // increment counter number
+                counters = cnt;
+                if (lowerBound != -1)
+                    mapLowerBound[cnt] = lowerBound;
+                else if (cnt != -1)  // there is a counter
+                    mapLowerBound[cnt] = 0;
+                if (upperBound != -1)
+                    mapUpperBound[cnt] = upperBound;
+                if (cnt != -1)
+                    mapCounter[s] = cnt;                          // map state to counter
             }
         }
 
@@ -3034,6 +3040,7 @@ namespace Microsoft.Automata
             List<string> new_update = new List<string>();
             string new_guard = "";
 
+
             // general dictionaries
             Dictionary<int, List<Tuple<int, int>>> mapMacros = new Dictionary<int, List<Tuple<int, int>>>();
             Dictionary<int, string> updates = new Dictionary<int, string>();
@@ -3072,12 +3079,14 @@ namespace Microsoft.Automata
                 return false;
             };
 
+
             int cycles = 0;
             var d = this.delta;
-            while (worklist.Count > 0 && cycles < 100)
+            while (worklist.Count > 0)
             {
                 CheckTimeout(timeoutLimit);
                 cycles++;
+
                 List<Tuple<int, int>> macros = worklist.Pop();
                 // remember expanded macros
                 expanded.Add(macros);
@@ -3108,10 +3117,10 @@ namespace Microsoft.Automata
                         if (this.GetSymbol(tr.Label) == sym_gr)
                         {
                             compat_trans.Add(tr);
-                            var guard = this.GetGuard(tr.Label);
-                            if (guard != "")
+                            if (mapCounter.ContainsKey(tr.SourceState))
                             {
-                                var counter = this.GetCounterNumber(guard);
+
+                                var counter = mapCounter[tr.SourceState];
                                 used_cnts[counter] = mapUpperBound[counter];
                             }
                         }
@@ -3127,6 +3136,7 @@ namespace Microsoft.Automata
                     //     (c -> "c < k", d -> "d < l") }
                     // where 'k' is the upper bound on counter 'c' and 'l' is the upper
                     // bound on counter 'd'
+
                     var choices = this.all_choices(used_cnts);
                     if (choices.Count() != 0)
                     {
@@ -3147,8 +3157,7 @@ namespace Microsoft.Automata
                                 // wrong format of input automata
                                 if (cnt_num == -1)
                                 {
-                                    var emptyCA = AutomatonCA<T>.Create(solver, initialState, finalStateList, new List<Move<T>>(), new List<int>(), new Dictionary<int, string>(), new Dictionary<int, string>(), new Dictionary<int, string>());
-                                    return emptyCA;
+                                    throw new InvalidOperationException();
                                 }
                                 new_guard += ", " + this.SubstituteVersion(cnt_guard.Value, cnt_num);
                             }
@@ -3161,8 +3170,9 @@ namespace Microsoft.Automata
                                 if (lab != "")  // there is a counter guard
                                 {
                                     // if this is a Moves with a counter guard
-                                    int cnt = this.GetCounterNumber(lab);     // counter number
-                                                                              // get the number of counters from the source state of the Moves
+                                    int cnt = mapCounter[tr.SourceState];     // counter number
+
+                                    // get the number of counters from the source state of the Moves
                                     int cnt_num = this.GetNmbrOfInstances(macros, tr.SourceState);
                                     // if the guard for a counter cnt is in a form cnt < k
                                     if (this.IsLower(choice_gr[cnt]))
@@ -3431,20 +3441,26 @@ namespace Microsoft.Automata
             //using (System.IO.StreamWriter file =
             //new System.IO.StreamWriter(@"C:\Users\lenka\view_refinement\Margus\automata-25-01-2019\output.txt"))
             //{
+
             //    file.WriteLine("Macros");
             //    foreach (var item in mapMacros)
             //    {
+
             //        file.WriteLine("{0}:", item.Key);
             //        foreach (var s in item.Value)
             //            file.WriteLine(s);
 
             //    }
+
             //    file.WriteLine("Edges");
             //    foreach (var item in updates)
             //    {
+
             //        file.WriteLine("{0}: {1}", item.Key, item.Value);
             //    }
             //}
+
+
             var labels = mapMacros.ToDictionary(k => k.Key, k => ConvertToString(k.Value));
             var guards = mapFinalGuards;
             AutomatonCA<T> detCA = AutomatonCA<T>.Create(solver, initialState, finalStateList, EnumerateMoves(delta), delta.Keys.ToList(), labels, updates, mapFinalGuards);

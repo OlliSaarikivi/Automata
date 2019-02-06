@@ -14,7 +14,7 @@ namespace Microsoft.Automata
         static int vecUintSize = Vector<uint>.Count;    
         static int vecByteSize = Vector<byte>.Count;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+       /* [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal unsafe static int UnsafeIndexOf(char* chars, int length, int start, BooleanDecisionTree toMatch, Vector<ushort>[] toMatchVecs)
         {
             //System.Diagnostics.Debug.Assert(Vector.IsHardwareAccelerated);
@@ -48,9 +48,9 @@ namespace Microsoft.Automata
                 }
                 return -1;
             }
-        }
+        }*/
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+       /* [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal unsafe static int UnsafeIndexOf(char* chars, int length, int start, BooleanDecisionTree toMatch, Vector<ushort> toMatchVec)
         {
             //System.Diagnostics.Debug.Assert(Vector.IsHardwareAccelerated);
@@ -105,9 +105,9 @@ namespace Microsoft.Automata
                 if (toMatch == chars[i]) return i;
             }
             return -1;
-        }
+        }*/
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+       /* [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal unsafe static int UnsafeIndexOfByte(byte[] input, int start, byte[] toMatch)
         {
             var toMatchVecs = toMatch.Select(x => new Vector<byte>(x)).ToArray();
@@ -136,7 +136,7 @@ namespace Microsoft.Automata
                 }
                 return -1;
             }
-        }
+        }*/
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int IndexOfByte(byte[] input, int i, byte toMatch, Vector<byte> toMatchVec)
@@ -188,7 +188,7 @@ namespace Microsoft.Automata
                 return -1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+       /* [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal unsafe static int UnsafeIndexOfByte(byte[] input, int i, byte toMatch, Vector<byte> toMatchVec)
         {
             var length = input.Length;
@@ -205,6 +205,6 @@ namespace Microsoft.Automata
                 }
                 return Array.IndexOf<byte>(input, toMatch, i);
             }
-        }
+        }*/
     }
 }

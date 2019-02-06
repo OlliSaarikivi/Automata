@@ -51,6 +51,59 @@ namespace Microsoft.Automata
             this.emptySet = SymbolicRegexSet<S>.MkEmptySet(this);
         }
 
+        internal SymbolicRegexNode<S> Normalize(SymbolicRegexNode<S> sr)
+        {
+            switch (sr.kind)
+            {
+                case SymbolicRegexKind.StartAnchor:
+                case SymbolicRegexKind.EndAnchor:
+                case SymbolicRegexKind.Epsilon:
+                case SymbolicRegexKind.Singleton:
+                    return sr;
+                case SymbolicRegexKind.Loop:
+                    {
+                        if (sr.IsStar)
+                            return sr;
+                        else if (sr.IsMaybe)
+                            return MkOr2(sr.left, this.epsilon);
+                        else if (sr.IsPlus)
+                        {
+                            var star = this.MkLoop(sr.left);
+                            var plus = this.MkConcat(sr.left, star);
+                            return plus;
+                        }
+                        else if (sr.upper == int.MaxValue)
+                        {
+                            var fixed_loop = this.MkLoop(sr.left, sr.lower, sr.lower);
+                            var star = this.MkLoop(sr.left);
+                            var concat = this.MkConcat(fixed_loop, star);
+                            return concat;
+                        }
+                        else
+                        {
+                            return sr;
+                        }
+                    }
+                case SymbolicRegexKind.Concat:
+                    {
+                        var left = Normalize(sr.left);
+                        var right = Normalize(sr.right);
+                        var concat = this.MkConcat(left, right);
+                        return concat;
+                    }
+                case SymbolicRegexKind.Or:
+                    {
+                        var alts = new List<SymbolicRegexNode<S>>();
+                        foreach (var elem in sr.alts)
+                            alts.Add(Normalize(elem));
+                        var or = this.MkOr(alts.ToArray());
+                        return or;
+                    }
+                default: //ITE 
+                    throw new NotSupportedException("Normalize not supported for " + sr.kind);
+            }
+        }
+
         /// <summary>
         /// Create a new symbolic regex builder.
         /// </summary>

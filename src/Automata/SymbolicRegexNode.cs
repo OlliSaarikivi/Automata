@@ -689,17 +689,27 @@ namespace Microsoft.Automata
         /// Temporary counter automaton exploration untility
         /// </summary>
         /// <returns></returns>
-        public Automaton<Tuple<Maybe<S>,Sequence<CounterUpdate>>> Explore()
+        public Automaton<Tuple<Maybe<S>, Sequence<CounterUpdate>>> Explore()
         {
+            var this_normalized = this.builder.Normalize(this);
             var stateLookup = new Dictionary<SymbolicRegexNode<S>, int>();
-            var regexLookup = new Dictionary<int,SymbolicRegexNode<S>>();
-            stateLookup[this] = 0;
+            var regexLookup = new Dictionary<int, SymbolicRegexNode<S>>();
+            stateLookup[this_normalized] = 0;
             int stateid = 2;
-            regexLookup[0] = this;
+            regexLookup[0] = this_normalized;
             SimpleStack<int> frontier = new SimpleStack<int>();
             var moves = new List<Move<Tuple<Maybe<S>, Sequence<CounterUpdate>>>>();
             var finalStates = new HashSet<int>();
             frontier.Push(0);
+            var reset0 = builder.GetNullabilityCondition(this_normalized);
+            if (reset0 != null)
+            {
+                if (reset0.TrueForAll(x => x.Counter.LowerBound == 0))
+                    reset0 = Sequence<CounterUpdate>.Empty;
+                moves.Add(Move<Tuple<Maybe<S>, Sequence<CounterUpdate>>>.Create(0, 1,
+                    new Tuple<Maybe<S>, Sequence<CounterUpdate>>(Maybe<S>.Nothing, reset0)));
+                finalStates.Add(1);
+            }
             while (frontier.IsNonempty)
             {
                 var q = frontier.Pop();
@@ -715,11 +725,12 @@ namespace Microsoft.Automata
                             p = stateid++;
                             stateLookup[cd.PartialDerivative] = p;
                             regexLookup[p] = cd.PartialDerivative;
-                            if (cd.PartialDerivative.isNullable)
-                                finalStates.Add(p);
-                            else if (cd.PartialDerivative.kind == SymbolicRegexKind.Loop)
+
+                            var reset = builder.GetNullabilityCondition(cd.PartialDerivative);
+                            if (reset != null)
                             {
-                                var reset = builder.GetCounterResetConditions(cd.PartialDerivative);
+                                if (reset.TrueForAll(x => x.Counter.LowerBound == 0))
+                                    reset = Sequence<CounterUpdate>.Empty;
                                 moves.Add(Move<Tuple<Maybe<S>, Sequence<CounterUpdate>>>.Create(p, 1,
                                     new Tuple<Maybe<S>, Sequence<CounterUpdate>>(Maybe<S>.Nothing, reset)));
                                 finalStates.Add(1);
@@ -735,7 +746,6 @@ namespace Microsoft.Automata
                 0, finalStates, moves);
             return aut;
         }
-
 
         internal Sequence<CounterUpdate> GetCounterInitConditions()
         {

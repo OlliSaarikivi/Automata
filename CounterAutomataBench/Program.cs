@@ -90,7 +90,8 @@ namespace CounterAutomataBench
             if (samples.Count == 1)
             {
                 average = samples[0];
-            } else if (samples.Count > 1)
+            }
+            else if (samples.Count > 1)
             {
                 average = (samples.Sum() - samples[0]) / (samples.Count - 1);
             }
@@ -142,7 +143,7 @@ namespace CounterAutomataBench
 
     class Program
     {
-        const int SAMPLES = 1;
+        const int SAMPLES = 10;
         const int TIMEOUT = 60000;
 
         static IEnumerable<string> ReadRegexes(string path)
@@ -175,7 +176,7 @@ namespace CounterAutomataBench
             {
                 stats.Add("pattern", regex);
             }
-
+            
             // Our pipeline
             if (runOur)
             {
@@ -323,11 +324,13 @@ namespace CounterAutomataBench
             return filtered.ToArray();
         }
 
-        static void BenchmarkFile(string path)
+        static void BenchmarkFile(string path, bool runOur, bool runClassical)
         {
             var regexes = ReadRegexes(path).ToArray();
             var filtered = FilterRegexes(regexes);
             var filenameNoExtension = Path.GetFileNameWithoutExtension(path);
+            Console.WriteLine("Benchmarking from " + path);
+
             if (filtered.Length < regexes.Length)
             {
                 Console.WriteLine($"{filtered.Length}/{regexes.Length} regexes passed filter.");
@@ -339,11 +342,10 @@ namespace CounterAutomataBench
             {
                 Console.WriteLine("All regexes passed filter.");
             }
-            var stats = Benchmark(filtered,
-                runOur: !filenameNoExtension.Contains("NoCadet"),
-                runClassical: !filenameNoExtension.Contains("NoClassical"));
+            var stats = Benchmark(filtered, runOur, runClassical);
             var outPath = $"{Path.GetFileNameWithoutExtension(path)}-results-{Guid.NewGuid()}.txt";
             stats.WriteTSV(outPath);
+            Console.WriteLine("Wrote results to " + Path.GetFullPath(outPath));
         }
 
         static void Main(string[] args)
@@ -353,10 +355,36 @@ namespace CounterAutomataBench
                 Console.Error.WriteLine("Usage: CounterAutomataBench.exe <regexes-file1> [<regexes-file2> ...]");
                 System.Environment.Exit(1);
             }
-            foreach (var arg in args)
+            bool runOur = false;
+            bool runClassical = false;
+            while (true)
             {
-                BenchmarkFile(arg);
+                Console.WriteLine("Choose pipelines to run: us, classical, both");
+                var choice = Console.ReadLine();
+                switch (choice)
+                {
+                    case "us":
+                        runOur = true;
+                        goto BENCHMARK;
+                    case "classical":
+                        runClassical = true;
+                        goto BENCHMARK;
+                    case "both":
+                        runOur = true;
+                        runClassical = true;
+                        goto BENCHMARK;
+                    default:
+                        Console.WriteLine("Invalid choice: " + choice);
+                        break;
+                }
             }
+
+            BENCHMARK: foreach (var arg in args)
+            {
+                BenchmarkFile(arg, runOur, runClassical);
+            }
+            Console.WriteLine("Benchmarks finished, press enter to exit.");
+            Console.ReadLine();
         }
     }
 }

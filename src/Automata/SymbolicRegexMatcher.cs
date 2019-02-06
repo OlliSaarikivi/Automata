@@ -1998,7 +1998,7 @@ namespace Microsoft.Automata
         /// <param name="k">length of the input</param>
         /// <param name="i">the start index in input to search from</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+       /* [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe int IndexOfStartset_(char* input, int k, int i)
         {
             while (i < k)
@@ -2014,7 +2014,7 @@ namespace Microsoft.Automata
             else
                 return i;
         }
-
+        */
         /// <summary>
         ///  Find first occurrence of value in input starting from index i.
         /// </summary>
@@ -2066,7 +2066,7 @@ namespace Microsoft.Automata
         /// <param name="k">length of input string</param>
         /// <param name="i">the start index in input</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe int IndexOfStartPrefix_(char* input, int k, int i)
         {
             int l = this.A_prefix.Length;
@@ -2090,7 +2090,7 @@ namespace Microsoft.Automata
                 }
             }
             return -1;
-        }
+        }*/
 
         #endregion
 
