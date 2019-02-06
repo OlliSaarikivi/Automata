@@ -73,8 +73,7 @@ namespace CounterAutomataBench
 
     class HotAverage : Stat
     {
-        int count = 0;
-        double sum = 0;
+        List<double> samples = new List<double>();
 
         public HotAverage(Stats stats, string name) : base(stats, name)
         {
@@ -82,14 +81,39 @@ namespace CounterAutomataBench
 
         public void Add(double value)
         {
-            if (count > 0)
-                sum += value;
-            count += 1;
+            samples.Add(value);
         }
 
         public override string ToString()
         {
-            return (sum / (count - 1)).ToString();
+            double average = double.NaN;
+            if (samples.Count == 1)
+            {
+                average = samples[0];
+            } else if (samples.Count > 1)
+            {
+                average = (samples.Sum() - samples[0]) / (samples.Count - 1);
+            }
+            return average.ToString();
+        }
+    }
+
+    class Message : Stat
+    {
+        string message = "";
+
+        public Message(Stats stats, string name) : base(stats, name)
+        {
+        }
+
+        public void Add(string newMessage)
+        {
+            message += newMessage.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+        }
+
+        public override string ToString()
+        {
+            return message;
         }
     }
 
@@ -118,7 +142,7 @@ namespace CounterAutomataBench
 
     class Program
     {
-        const int SAMPLES = 10;
+        const int SAMPLES = 1;
         const int TIMEOUT = 60000;
 
         static IEnumerable<string> ReadRegexes(string path)
@@ -163,24 +187,39 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
+                    using (var exception = new Message(stats, "Our exception"))
+                    using (var dcaSize = new Exact<int>(stats, "|DCA|"))
                     using (var ncaSize = new Exact<int>(stats, "|NCA|"))
-                    using (var srToNCA = new HotAverage(stats, "SR->NCA (milliseconds)"))
+                    using (var ncaToDca = new HotAverage(stats, "NCA->DCA (milliseconds)"))
+                    using (var srToNca = new HotAverage(stats, "SR->NCA (milliseconds)"))
                     using (var regexToSR = new HotAverage(stats, "regex->SR (milliseconds)"))
-                        for (int i = 0; i <= SAMPLES; ++i)
+                    {
+                        try
                         {
-                            sw.Restart();
-                            var sr = ((SymbolicRegex<ulong>)new Regex(regex, RegexOptions.Singleline).Compile(true, false)).Pattern;
-                            regexToSR.Add(sw.Elapsed.TotalMilliseconds);
+                            for (int i = 0; i <= SAMPLES; ++i)
+                            {
+                                sw.Restart();
+                                var sr = ((SymbolicRegex<ulong>)new Regex(regex, RegexOptions.Singleline).Compile(true, false)).Pattern;
+                                regexToSR.Add(sw.Elapsed.TotalMilliseconds);
 
-                            sw.Restart();
-                            var nca = sr.Explore();
-                            srToNCA.Add(sw.Elapsed.TotalMilliseconds);
+                                sw.Restart();
+                                var nca = sr.Explore();
+                                srToNca.Add(sw.Elapsed.TotalMilliseconds);
+                                ncaSize.Add(nca.StateCount);
 
-                            // TODO: add NCA->DCA benchmark
-
-                            ncaSize.Add(nca.StateCount);
-                            // TODO: add number of counters in DCA form
+                                sw.Restart();
+                                var dca = nca.DeterminizeCA(TIMEOUT);
+                                ncaToDca.Add(sw.Elapsed.TotalMilliseconds);
+                                dcaSize.Add(dca.StateCount);
+                                // TODO: add number of counters in DCA form
+                            }
                         }
+                        catch (Exception e)
+                        {
+                            exception.Add(e.ToString());
+                            Console.WriteLine(e);
+                        }
+                    }
                 }
             }
 
@@ -198,7 +237,7 @@ namespace CounterAutomataBench
                     Console.WriteLine($"{count}/{regexes.Length}");
                     Stopwatch sw = new Stopwatch();
 
-                    using (var timedOut = new Exact<bool>(stats, "Classical timeout"))
+                    using (var exception = new Message(stats, "Classical exception"))
                     using (var minSize = new Exact<int>(stats, "|min|"))
                     using (var dfaSize = new Exact<int>(stats, "|DFA|"))
                     using (var nfaSize = new Exact<int>(stats, "|NFA|"))
@@ -214,7 +253,7 @@ namespace CounterAutomataBench
                                 var nfa = regexConverter.Convert(regex);
                                 regexToNfa.Add(sw.Elapsed.TotalMilliseconds);
                                 nfaSize.Add(nfa.StateCount);
-                                
+
                                 sw.Restart();
                                 var dfa = nfa.Determinize(TIMEOUT);
                                 nfaToDfa.Add(sw.Elapsed.TotalMilliseconds);
@@ -225,11 +264,11 @@ namespace CounterAutomataBench
                                 dfaToMin.Add(sw.Elapsed.TotalMilliseconds);
                                 minSize.Add(min.StateCount);
                             }
-                            timedOut.Add(false);
                         }
-                        catch (TimeoutException)
+                        catch (Exception e)
                         {
-                            timedOut.Add(true);
+                            exception.Add(e.ToString());
+                            Console.WriteLine(e);
                         }
                     }
                 }

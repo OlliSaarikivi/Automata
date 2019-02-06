@@ -94,6 +94,7 @@
     <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutomatonCA.cs" />
     <Compile Include="BooleanAlgebras\BV64Algebra.cs" />
     <Compile Include="BooleanAlgebras\BVAlgebra.cs" />
     <Compile Include="BV.cs" />

@@ -6,6 +6,8 @@ using Microsoft.Automata.Utilities;
 using Microsoft.Automata.BooleanAlgebras;
 using System.IO;
 using System.Runtime.Serialization;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Microsoft.Automata
 {
@@ -2531,6 +2533,923 @@ namespace Microsoft.Automata
             return det;
         }
 
+        /**
+         * Return guards of the edges
+         **/
+        private List<string> GetGuards(List<Move<T>> out_trans)
+        {
+            List<string> guards = new List<string>();
+            foreach (var tr in out_trans)
+            {
+                guards.Add(this.GetGuard(tr.Label));
+            }
+            return guards;
+        }
+
+        /**
+         * Is zero state?
+         */
+        public bool IsZeroState(List<Move<T>> out_trans)
+        {
+            bool plus = false;  // increment
+            bool equal = false; // outgoing edge
+            var guards = this.GetGuards(out_trans);
+            foreach (var g in guards)
+            {
+                if (this.IsPlus(g))
+                    plus = true;
+                if (this.IsEqual(g))
+                    equal = true;
+            }
+            return plus && !equal;  // state has a loop but not outgoing edge with a condition
+        }
+
+        /**
+         * Get symbol from a label
+         * */
+        private Int64 GetSymbol(T cond)
+        {
+            string pattern;
+            pattern = @"\((\d*), \[[^\]]*\]\)";
+            Regex rgx = new Regex(pattern);
+            string label = this.DescribeLabel(cond);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+                return Int64.Parse(data[1].ToString());
+            else
+                return -1;
+        }
+
+        /**
+         * Get guard from a label
+         * */
+        private string GetGuard(T cond)
+        {
+            string pattern;
+            pattern = @"[0-9\[\]]+, \[([^<:]+<[^:]+):[^\]]+\]";
+            Regex rgx = new Regex(pattern);
+            string label = this.DescribeLabel(cond);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+                return data[1].ToString();
+            return "";
+        }
+
+        /**
+         * Get number of counter from a label.
+         * */
+        private int GetCounterNumber(string label)
+        {
+            string pattern;
+            pattern = @"c([0-9])*[<=]+[0-9]*";  // c0<k | c0==k
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+                return int.Parse(data[1].ToString());
+            else
+            {
+                pattern = @"[0-9]*<=c([0-9])*";  // 10<=c
+                rgx = new Regex(pattern);
+                match = rgx.Match(label);
+                data = match.Groups;
+                if (match.Success)
+                    return int.Parse(data[1].ToString());
+            }
+            return -1;
+        }
+
+        /**
+         * Check if label is in a form c0 < 10
+         * */
+        private bool IsLower(string label)
+        {
+            string pattern;
+            pattern = @"c[0-9]*<[0-9]*";
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            return match.Success;
+        }
+
+        /**
+         * Check if label is in a form 10<=c0
+         * */
+        private bool IsEqual(string label)
+        {
+            string pattern;
+            pattern = @"[0-9]*<=c[0-9]*";
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            return match.Success;
+        }
+
+        /**
+         * Check if label is in a form 0<c0<=k
+         * */
+        private bool IsBetween(string label)
+        {
+            string pattern;
+            pattern = @"0<=c[0-9]*<=[0-9]*";
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            return match.Success;
+        }
+
+        /**
+         * Check if label is in a form c0[0]++
+         * */
+        private bool IsPlus(string label)
+        {
+            return label.Contains("++");
+        }
+
+        /**
+         * Check if there is condition cnt < k
+         * */
+        private bool ContainsEq(List<string> factorList, string equation)
+        {
+            foreach (var fac in factorList)
+            {
+                if (fac == equation)
+                    return true;
+            }
+            return false;
+        }
+
+        /**
+         * Get bound of the counter
+         * */
+        private int GetCounterBound(string label)
+        {
+            string pattern;
+            pattern = @"c[0-9]*<([0-9]*)";  // c0 < 10
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+                return int.Parse(data[1].ToString());
+            else
+            {
+                pattern = @"([0-9]*)<=c[0-9]*"; // 10 <= c
+                rgx = new Regex(pattern);
+                match = rgx.Match(label);
+                data = match.Groups;
+                if (match.Success)
+                    return int.Parse(data[1].ToString());
+            }
+            return -1;
+        }
+
+        /**
+         * Map state to counter and counter to its upper bound
+         */
+        public void Preprocess(List<int> states, out Dictionary<int, int> mapLowerBound, out Dictionary<int, int> mapUpperBound, out Dictionary<int, int> mapCounter, out List<int> zeroStates)//, out Dictionary<int, List<int>> symbols, out Dictionary<int, List<string>> labels)
+        {
+            mapUpperBound = new Dictionary<int, int>();
+            mapLowerBound = new Dictionary<int, int>();
+            mapCounter = new Dictionary<int, int>();
+            //  iterate through all states
+            zeroStates = new List<int>();
+            foreach (var s in states)
+            {
+                // get all outgoing transitions
+                List<Move<T>> out_trans = this.GetMovesFrom(s).ToList();
+                if (this.IsZeroState(out_trans))
+                    zeroStates.Add(s);
+                foreach (var tr in out_trans)
+                {
+                    var lab = this.GetGuard(tr.Label);
+                    var symbol = this.GetSymbol(tr.Label);
+                    int cnt = 0;
+                    int lowerBound = -1;
+                    int upperBound = -1;
+                    if (lab != "")  // there is a counter guard
+                    {
+                        cnt = this.GetCounterNumber(lab);         // get counter number
+                        if (this.IsLower(lab) && tr.SourceState == tr.TargetState)
+                            upperBound = this.GetCounterBound(lab);    // map counter to its upper bound
+                        else if (this.IsEqual(lab))
+                            lowerBound = this.GetCounterBound(lab);
+                        if (tr.SourceState == tr.TargetState)
+                            mapCounter[s] = cnt;                          // map state to counter
+                    }
+                    if (lowerBound != -1)
+                        mapLowerBound[cnt] = lowerBound;
+                    if (upperBound != -1)
+                        mapUpperBound[cnt] = upperBound;
+                }
+            }
+        }
+
+        /**
+         * Check if state is a counter state.
+         */
+        private bool IsCounterState(int state, Dictionary<int, int> mapState)
+        {
+            return mapState.ContainsKey(state); // return true, if state in the list that map state to some counter
+        }
+
+        /**
+         * Generate a set of minterms
+         **/
+        private List<Int64> GenMinterms(List<Int64> sym_guards)
+        {
+            List<Int64> list = sym_guards.Distinct().ToList();
+            return list;
+        }
+
+        /**
+        * Return symbolic guards of the edges
+        **/
+        private List<Int64> GetSymbolicGuards(List<Move<T>> out_trans)
+        {
+            T[] conds;
+            List<Int64> sym_grds = new List<Int64>();
+            conds = Array.ConvertAll(out_trans.ToArray(), move => { return move.Label; });
+            foreach (var cond in conds)
+            {
+                Int64 symbol = this.GetSymbol(cond);
+                if (symbol != -1)
+                {
+                    sym_grds.Add(symbol);
+                }
+            }
+            return sym_grds;
+        }
+
+        private List<Dictionary<int, string>> GenerateCombinations<T>(
+                                List<List<T>> collectionOfSeries)
+        {
+            List<List<T>> generatedCombinations =
+                collectionOfSeries.Take(1)
+                                  .FirstOrDefault()
+                                  .Select(i => (new T[] { i }).ToList())
+                                  .ToList();
+
+            foreach (List<T> series in collectionOfSeries.Skip(1))
+            {
+                generatedCombinations =
+                    generatedCombinations
+                          .Join(series as List<T>,
+                                combination => true,
+                                i => true,
+                                (combination, i) =>
+                                {
+                                    List<T> nextLevelCombination =
+                                new List<T>(combination);
+                                    nextLevelCombination.Add(i);
+                                    return nextLevelCombination;
+                                }).ToList();
+
+            }
+            List<Dictionary<int, string>> list = new List<Dictionary<int, string>>();
+            foreach (var item in generatedCombinations)
+            {
+                list.Add(item.Distinct().ToDictionary(x => this.GetCounterNumber(x.ToString()), x => x.ToString()));
+            }
+            return list;
+        }
+
+        /**
+         * Get all possible combinations of guards.
+         * */
+        private List<Dictionary<int, string>> all_choices(Dictionary<int, int> counters)
+        {
+            List<Dictionary<int, string>> combinations = new List<Dictionary<int, string>>();
+            List<List<string>> guards = new List<List<string>>();
+            if (counters.Count > 0)
+            {
+                foreach (var c in counters)  // generate guards for each counter c < k, c == k
+                {
+                    guards.Add(new List<string> { "c" + c.Key + "<" + c.Value, "c" + c.Key + "==" + c.Value });
+                }
+                return GenerateCombinations(guards);
+            }
+            return combinations;
+        }
+
+        /**
+         * Get current value of the counter.
+         */
+        public int GetCurrentValue(List<Tuple<int, int>> macros, Dictionary<int, int> mapCounter, int cnt)
+        {
+            var state = mapCounter.FirstOrDefault(x => x.Value == cnt).Key;
+            int value = -1;
+            try
+            {
+                value = macros.Where(pair => pair.Item1 == state)  // get state for the counter
+                                 .Select(pair => new { Item = pair })
+                                 .Select(item => item.Item)
+                                 .ToList()[0].Item2;
+            }
+            catch { }
+            return value;
+        }
+
+
+        //Replace("c" + cnt, "c" + "["+ (cnt_num-1) + "]")
+
+        /**
+         * Substitute ck[x] for ck[x-1]  
+         * */
+        private string SubstituteVersion(string label, int value)
+        {
+            string pattern;
+            pattern = @"c([0-9])*([<=]+[0-9]*)";  // c0<k | c0==k
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+                return "c" + data[1] + "[" + (value - 1) + "]" + data[2];
+            else
+            {
+                pattern = @"([0-9]*<=)c([0-9])*";  // 10<=c
+                rgx = new Regex(pattern);
+                match = rgx.Match(label);
+                data = match.Groups;
+                if (match.Success)
+                    return data[1] + "c" + data[2] + "[" + (value - 1) + "]";
+            }
+            return label;
+        }
+
+        /**
+         * Get number of instances of a counter linked to the state.
+         */
+        private int GetNmbrOfInstances(List<Tuple<int, int>> macros, int state)
+        {
+            foreach (var macro in macros)
+            {
+                if (macro.Item1 == state)
+                {
+                    return macro.Item2;
+                }
+            }
+            return -1;
+        }
+
+        public IEnumerable<Move<T>> GetMovesFromNoCycles(int sourceState)
+        {
+            List<Move<T>> outMoves = new List<Move<T>>();
+            foreach (var tr in delta[sourceState])
+                if (tr.TargetState != sourceState)
+                    outMoves.Add(tr);
+            return outMoves;
+        }
+
+        /**
+         * Reduce
+         */
+        public List<Tuple<int, int>> Reduce(List<Tuple<int, int>> list)
+        {
+            List<Tuple<int, int>> micros = new List<Tuple<int, int>>();
+            //  //where (j.Item2 == Math.Max(from k in list where (k.Item1 == j.Item1) select k.Item2))
+            var l = from j in list
+                    where (j.Item2 == (from k in list where (k.Item1 == j.Item1) select k.Item2).Max())
+                    select j;
+            var l_distinct = l.ToList().Distinct().ToList();
+            return l_distinct;
+        }
+
+        /**
+         * Check if label is in a form cx[i]++ for counter x.
+         * If so then substitute is with "cnt[i+1] = cnt[i] + 1".
+         * */
+        private string SubstitutePlus(string label, int counter)
+        {
+            string pattern;
+            pattern = @"c([0-9]*)\[([0-9]*)\]\+\+";
+            Regex rgx = new Regex(pattern);
+            Match match = rgx.Match(label);
+            GroupCollection data = match.Groups;
+            if (match.Success)
+            {
+                int cntr = int.Parse(data[1].ToString());
+                int vrsn = int.Parse(data[2].ToString());
+                if (cntr == counter)  // if it is the same counter as given
+                    return "c" + cntr + "[" + (vrsn + 1) + "]=c" + cntr + "[" + vrsn + "]+1";
+            }
+            return label;
+        }
+
+        /**
+         * Compare two lists of tuples.
+         */
+        public bool CompareLists(List<Tuple<int, int>> list1, List<Tuple<int, int>> list2)
+        {
+            bool match = true;
+            if (list1.Count == list2.Count)
+            {
+                if (list2.Count == 0)    // sink state
+                    return true;
+                foreach (var item in list1)
+                {
+                    if (!list2.Contains(item))
+                    {
+                        match = false;
+                        break;
+                    }
+                    if (!match)
+                        break;
+                }
+            }
+            else
+                return false;
+            return match;
+        }
+
+        /**
+         * Get target counters.
+         */
+        public List<int> GetTrgCounters(int trg)
+        {
+            // get outgoing edges
+            List<Move<T>> out_trans = this.GetMovesFrom(trg).ToList();
+            List<int> counters = new List<int>();
+            foreach (var tr in out_trans)
+            {
+                string guard = this.GetGuard(tr.Label);
+                if (guard != "")
+                {
+                    // get counter of the outgoing edge
+                    counters.Add(this.GetCounterNumber(guard));
+                }
+            }
+            return counters.Distinct().ToList();
+        }
+
+        /**
+         * Check if macrostate was not already expanded
+         */
+        public bool NotExpanded(List<List<Tuple<int, int>>> expanded, List<Tuple<int, int>> new_ms)
+        {
+            foreach (var macro in expanded)
+            {
+                if (this.CompareLists(macro, new_ms))
+                    return false;
+            }
+            return true;
+        }
+
+        /**
+         * Convert list of tuples to string.
+         */
+        private string ConvertToString(List<Tuple<int, int>> list)
+        {
+            string label = string.Join(",", list.Select(t => string.Format("({0}, {1})", t.Item1, t.Item2)));
+            return label;
+        }
+
+        /**
+         * Get state number of the macrostate
+         */
+        public int GetState(Dictionary<int, List<Tuple<int, int>>> mapMacros, List<Tuple<int, int>> macro)
+        {
+            foreach (int i in mapMacros.Keys)
+            {
+                if (this.CompareLists(mapMacros[i], macro))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        public AutomatonCA<T> DeterminizeCA(int timeout = 0)
+        {
+            long timeout1 = Microsoft.Automata.Utilities.HighTimer.Frequency * ((long)timeout / (long)1000);
+            long timeoutLimit;
+            if (timeout > 0)
+                timeoutLimit = Utilities.HighTimer.Now + timeout1;
+            else
+                timeoutLimit = 0;
+
+            IBooleanAlgebra<T> solver = algebra;
+            List<Move<T>> out_trans = new List<Move<T>>();
+            var worklist = new Stack<List<Tuple<int, int>>>();
+            var expanded = new List<List<Tuple<int, int>>>();
+            List<Tuple<int, int>> new_ms = new List<Tuple<int, int>>();
+            List<string> new_update = new List<string>();
+            string new_guard = "";
+
+            // general dictionaries
+            Dictionary<int, List<Tuple<int, int>>> mapMacros = new Dictionary<int, List<Tuple<int, int>>>();
+            Dictionary<int, string> updates = new Dictionary<int, string>();
+            Dictionary<int, int> mapLowerBound = new Dictionary<int, int>();
+            Dictionary<int, int> mapUpperBound = new Dictionary<int, int>();
+            Dictionary<int, int> mapCounter = new Dictionary<int, int>();
+            Dictionary<int, List<string>> mapGuards = new Dictionary<int, List<string>>();
+            Dictionary<int, List<int>> mapSymbols = new Dictionary<int, List<int>>();
+            Dictionary<int, string> mapFinalGuards = new Dictionary<int, string>();
+
+            // TODO: states = { macrostate} //add macrostate to the set of states
+            List<int> states = new List<int>(this.States);
+            List<int> zeroStates = new List<int>();
+            // preprocessing - map state to counter and counter to its upper bound
+            this.Preprocess(states, out mapLowerBound, out mapUpperBound, out mapCounter, out zeroStates);
+            PowerSetStateBuilder dfaStateBuilder = PowerSetStateBuilder.Create(states.ToArray());
+            var startState = 0;
+
+            // create start state with 0 - not a counter state, 1 - a counter state
+            var stateM = Tuple.Create(this.initialState, this.IsCounterState(this.initialState, mapCounter) ? 1 : 0);
+            List<Tuple<int, int>> macrostate = new List<Tuple<int, int>> { stateM };
+            worklist.Push(macrostate);
+
+            mapMacros[mapMacros.Count] = macrostate;
+
+            var delta = new Dictionary<int, List<Move<T>>>();
+            delta[startState] = new List<Move<T>>();
+            var finalStateList = new HashSet<int>();
+
+
+            Func<int, bool> IsDFAFinalState = id =>
+            {
+                foreach (int state in dfaStateBuilder.GetMembers(id))
+                    if (this.IsFinalState(state))
+                        return true;
+                return false;
+            };
+
+            int cycles = 0;
+            var d = this.delta;
+            while (worklist.Count > 0 && cycles < 100)
+            {
+                CheckTimeout(timeoutLimit);
+                cycles++;
+                List<Tuple<int, int>> macros = worklist.Pop();
+                // remember expanded macros
+                expanded.Add(macros);
+                out_trans = new List<Move<T>>();
+                foreach (var st in macros)
+                {
+                    // collect outgoing moves
+                    var out_edges = this.GetMovesFrom(st.Item1);
+                    out_trans = out_trans.Concat(out_edges).ToList();
+                }
+
+                // get symbolic guards of the moves
+                List<Int64> sym_grds = this.GetSymbolicGuards(out_trans);
+                // make outgoing symbol guards disjoint
+                List<Int64> symb_guard_minterms = this.GenMinterms(sym_grds);
+
+                // var conds = Array.ConvertAll(out_trans.ToArray(), move => { return move.Label; });
+                // var min =  solver.GenerateMinterms(conds);
+
+
+                foreach (var sym_gr in symb_guard_minterms)
+                {
+                    // first, we collect Moves with compatible symbol guards
+                    List<Move<T>> compat_trans = new List<Move<T>>();
+                    Dictionary<int, int> used_cnts = new Dictionary<int, int>();  // store counters and its bound
+                    foreach (Move<T> tr in out_trans)
+                    {
+                        if (this.GetSymbol(tr.Label) == sym_gr)
+                        {
+                            compat_trans.Add(tr);
+                            var guard = this.GetGuard(tr.Label);
+                            if (guard != "")
+                            {
+                                var counter = this.GetCounterNumber(guard);
+                                used_cnts[counter] = mapUpperBound[counter];
+                            }
+                        }
+                    }
+                    // skip if there is no [] symbol on any edge
+                    if (compat_trans.Count == 0)
+                        continue;
+                    /// iterate over all choices of conditions on guards over used_cnts,
+                    // e.g., if used_cnts = {c, d}, we generate the following 4 choices:
+                    //   { (c -> "c = k", d -> "d = l"),
+                    //     (c -> "c < k", d -> "d = l"),
+                    //     (c -> "c = k", d -> "d < l"),
+                    //     (c -> "c < k", d -> "d < l") }
+                    // where 'k' is the upper bound on counter 'c' and 'l' is the upper
+                    // bound on counter 'd'
+                    var choices = this.all_choices(used_cnts);
+                    if (choices.Count() != 0)
+                    {
+                        foreach (var choice_gr in this.all_choices(used_cnts))
+                        {
+                            // we would like to do the following, but cannot, since we need to
+                            // index the counters in choice_gr
+                            //
+                            // new_guard = sym_gr /\ make_conj(choice_gr);
+
+                            new_guard = this.GetSymbol(compat_trans[0].Label) + "";
+                            foreach (var cnt_guard in choice_gr)
+                            {
+                                // question: why cnt and cnt_state here?
+                                int cnt = cnt_guard.Key;            // counter number
+                                int cnt_state = mapCounter.FirstOrDefault(x => x.Value == cnt).Key;    // remember counter state
+                                int cnt_num = this.GetCurrentValue(macros, mapCounter, cnt);
+                                // wrong format of input automata
+                                if (cnt_num == -1)
+                                {
+                                    var emptyCA = AutomatonCA<T>.Create(solver, initialState, finalStateList, new List<Move<T>>(), new List<int>(), new Dictionary<int, string>(), new Dictionary<int, string>(), new Dictionary<int, string>());
+                                    return emptyCA;
+                                }
+                                new_guard += ", " + this.SubstituteVersion(cnt_guard.Value, cnt_num);
+                            }
+                            new_ms = new List<Tuple<int, int>>();
+                            new_update = new List<string>();
+
+                            foreach (Move<T> tr in compat_trans)
+                            {
+                                var lab = this.GetGuard(tr.Label);
+                                if (lab != "")  // there is a counter guard
+                                {
+                                    // if this is a Moves with a counter guard
+                                    int cnt = this.GetCounterNumber(lab);     // counter number
+                                                                              // get the number of counters from the source state of the Moves
+                                    int cnt_num = this.GetNmbrOfInstances(macros, tr.SourceState);
+                                    // if the guard for a counter cnt is in a form cnt < k
+                                    if (this.IsLower(choice_gr[cnt]))
+                                    {
+                                        // if the guard of the transition is in a form cnt < k
+                                        if (this.IsLower(lab))
+                                        {
+                                            // lower-lower
+
+                                            // if it is a loop
+                                            if (tr.SourceState == tr.TargetState)
+                                            {
+                                                // increment all counters
+                                                for (int j = 0; j < cnt_num; ++j)
+                                                {
+                                                    new_update.Add("c" + cnt.ToString() + "[" + j + "]++");
+                                                    // TODO: solve the shift
+                                                }
+                                                new_ms.Add(Tuple.Create(tr.TargetState, cnt_num));
+                                            }
+                                            else // if we go out of the state
+                                            {
+                                                if (this.IsCounterState(tr.TargetState, mapCounter))
+                                                {
+                                                    int tgt_cnt = mapCounter[tr.TargetState];   // get target counter
+                                                    new_ms.Add(Tuple.Create(tr.TargetState, 1));
+                                                    new_update.Add("c" + tgt_cnt + "[0]=0");
+                                                }
+                                                else
+                                                {
+                                                    new_ms.Add(Tuple.Create(tr.TargetState, 0));
+                                                }
+                                            }
+                                        } // lower - equal
+                                        else { /* do nothing*/ }
+                                    }
+                                    else // if (choice_gr[cnt] == "cnt = k")
+                                    {
+                                        if (this.IsLower(lab))
+                                        {   // equal-lower
+                                            // choice_gr[cnt] == "cnt = k" /\ tr.cnt_guard == "cnt < k"
+                                            if (cnt_num > 1)
+                                            {   // if this is not the last counter (the others can leave)
+                                                if (tr.SourceState == tr.TargetState)
+                                                {   // if in a loop, we loose one counter and loop with the rest
+                                                    for (int i = 0; i < cnt_num - 1; ++i)
+                                                    {
+                                                        new_update.Add("c" + cnt + "[" + i + "]++");
+                                                    }
+                                                    new_ms.Add(Tuple.Create(tr.TargetState, cnt_num - 1));
+                                                }
+                                                else
+                                                {   // if we go out of the state
+                                                    if (this.IsCounterState(tr.TargetState, mapCounter))
+                                                    {
+                                                        int tgt_cnt = mapCounter[tr.TargetState];   // get target counter
+                                                        new_ms.Add(Tuple.Create(tr.TargetState, 1));
+                                                        new_update.Add("c" + tgt_cnt + "[0]=0");
+                                                    }
+                                                    else
+                                                    {
+                                                        new_ms.Add(Tuple.Create(tr.TargetState, 0));
+                                                    }
+                                                }
+                                            }
+                                            else { /* DO NOTHING */ }
+                                        }
+                                        else
+                                        {   // equal-equal
+                                            // choice_gr[cnt] == "cnt = k" /\ tr.cnt_guard == "cnt = k"
+                                            System.Diagnostics.Debug.Assert(tr.SourceState != tr.TargetState);
+                                            if (this.IsCounterState(tr.TargetState, mapCounter))
+                                            {
+                                                int tgt_cnt = mapCounter[tr.TargetState];   // get target counter
+                                                new_ms.Add(Tuple.Create(tr.TargetState, 1));
+                                                new_update.Add("c" + tgt_cnt + "[0]=0");
+                                            }
+                                            else
+                                            {   // not a counter state
+                                                new_ms.Add(Tuple.Create(tr.TargetState, 0));
+                                            }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (this.IsCounterState(tr.TargetState, mapCounter))
+                                    {
+                                        int tgt_cnt = mapCounter[tr.TargetState];   // get target counter
+                                        new_ms.Add(Tuple.Create(tr.TargetState, 1));
+                                        new_update.Add("c" + tgt_cnt + "[0]=0");
+                                    }
+                                    else
+                                    {
+                                        new_ms.Add(Tuple.Create(tr.TargetState, 0));
+                                    }
+                                }
+                            }
+                            // empty macrostate - skip
+                            if (new_ms.Count() == 0)
+                                continue;
+                            bool kill = false;
+                            // finished processing all transitions
+                            if (new_update.Count() != 0)
+                            {
+                                for (int cnt = 0; cnt < mapUpperBound.Count(); ++cnt)
+                                {
+                                    // TODO: 
+                                    if (new_update.Contains("c" + cnt + "[0]=0") && new_update.Contains("c" + cnt + "[0]++"))
+                                    {
+                                        int st = mapCounter.FirstOrDefault(x => x.Value == cnt).Key;            // get state for counter cnt
+                                        List<Move<T>> out_trans_st = this.GetMovesFromNoCycles(st).ToList();    // get outgoing edges
+                                        List<string> grds = this.GetGuards(out_trans_st);                       // get guards from the outgoing edges
+                                        if (zeroStates.Contains(st))
+                                            new_update.Remove("c" + cnt + "[0]++"); // keep the lowest counter (the higher are simulated)
+                                        else
+                                        {   // the outgoing state had only an outgoing transition over "c == k"
+                                            for (var eq = 0; eq < new_update.Count(); eq++)
+                                            {
+                                                // substitute "cnt[i]++" with "cnt[i+1] = cnt[i] + 1";
+                                                new_update[eq] = this.SubstitutePlus(new_update[eq], cnt);
+                                            }
+                                            new_ms = this.Reduce(new_ms);
+                                            int i = 0;
+                                            for (i = 0; i < new_ms.Count(); ++i)
+                                            {
+                                                if (new_ms[i].Item1 == mapCounter.FirstOrDefault(x => x.Value == cnt).Key)  // find adequate macro for counter
+                                                    if (new_ms[i].Item2 < mapUpperBound[cnt]) // check if current value of counter is below its bound
+                                                        break;
+                                            }
+                                            if (i != new_ms.Count())
+                                                new_ms[i] = Tuple.Create(new_ms[i].Item1, new_ms[i].Item2 + 1);   // update number of versions of counter
+                                            else
+                                            {
+                                                // KILL THE MACROSTATE
+                                                kill = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!kill)
+                            {
+                                new_ms = this.Reduce(new_ms);
+                                int targetState = delta.Count();
+                                int tState = this.GetState(mapMacros, new_ms);
+                                if (tState != -1)
+                                {
+                                    targetState = tState;   // find equivalent macrostate
+                                }
+                                int sourceState = this.GetState(mapMacros, macros);
+                                T cond = out_trans[0].Label;
+                                var prodMove = Move<T>.Create(sourceState, targetState, cond);
+                                delta[sourceState].Add(prodMove);
+                                // store updates and macrostates to general dictionaries
+                                int index = sourceState * 10 + targetState;
+                                if (!updates.ContainsKey(index))
+                                    updates[index] = new_guard + ", ";
+                                else
+                                    updates[index] += ", " + new_guard + ", ";
+                                updates[index] += string.Join(", ", new_update.ToArray());
+                                mapMacros[targetState] = new_ms;
+                                if (!delta.ContainsKey(targetState))
+                                    delta[targetState] = new List<Move<T>>();
+                                // add new macrostate to the worklist if not already expanded
+                                if (this.NotExpanded(expanded, new_ms))
+                                    worklist.Push(new_ms);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // first, we collect Moves with compatible symbol guards
+                        new_guard = this.GetSymbol(compat_trans[0].Label) + "";
+                        new_ms = new List<Tuple<int, int>>();
+                        new_update = new List<string>();
+                        foreach (var tr in compat_trans)
+                        {
+                            // add initialization of the counter if target state is a counter state
+                            if (this.IsCounterState(tr.TargetState, mapCounter))
+                            {
+                                // Counter tgt_cnt = tr.tgt.counter; // TODO: implement this
+                                new_ms.Add(Tuple.Create(tr.TargetState, 1));
+                                // TODO: reimplement is, it should initialize the counter of target state 
+                                foreach (var c in this.GetTrgCounters(tr.TargetState))
+                                    new_update.Add("c" + c + "[0]=0");
+                                // TODO: solve the shift
+                            }
+                            else
+                            {
+                                new_ms.Add(Tuple.Create(tr.TargetState, 0));
+                            }
+                        }
+                        // for each symbol create one outgoing edge
+                        new_ms = this.Reduce(new_ms);    // delete redundant macros
+                        int targetState = delta.Count();
+                        int tState = this.GetState(mapMacros, new_ms);
+                        if (tState != -1)
+                        {
+                            targetState = tState;   // find equivalent macrostate
+                        }
+                        int sourceState = this.GetState(mapMacros, macros);
+
+                        var cond = out_trans[0].Label;
+                        var prodMove = Move<T>.Create(sourceState, targetState, cond);
+                        delta[sourceState].Add(prodMove);
+                        // store updates and macrostates to general dictionaries
+                        int index = sourceState * 10 + targetState;
+                        if (!updates.ContainsKey(index))
+                            updates[index] = new_guard + ", ";
+                        else
+                            updates[index] += new_guard + ", ";
+                        updates[index] += string.Join(", ", new_update.ToArray());
+                        mapMacros[targetState] = new_ms;
+                        if (!delta.ContainsKey(targetState))
+                            delta[targetState] = new List<Move<T>>();
+
+                        // add new macrostate to the worklist if not already expanded
+                        if (this.NotExpanded(expanded, new_ms))
+                            worklist.Push(new_ms);
+                    }
+                }
+            }
+
+            for (var i = 0; i < mapMacros.Count(); i++)
+            {
+                foreach (var st in mapMacros[i])
+                {
+                    // collect outgoing moves
+                    var out_edges = this.GetMovesFromNoCycles(st.Item1);
+                    if (out_edges.Count() == 0)
+                    {
+                        finalStateList.Add(i);  // no outgoing edge = final state
+                        mapFinalGuards[i] = "True";
+                    }
+                    foreach (var edge in out_edges)
+                    {
+                        var symbol = this.GetSymbol(edge.Label);     // symbol guard
+                        if (symbol == -1)    // epsilon transition
+                        {
+                            var label = this.GetGuard(edge.Label);   // get label
+                            var cnt = this.GetCounterNumber(label);  // get counter number
+                            finalStateList.Add(i);                   // no outgoing edge = final state
+                            // epsilon transition
+                            if (cnt == -1)
+                            {
+                                mapFinalGuards[i] = "True";
+                            }
+                            else
+                            {
+                                if (mapUpperBound[cnt] == mapLowerBound[cnt])  // c{2}
+                                    mapFinalGuards[i] = "c" + cnt + "[" + (st.Item2 - 1) + "]==" + mapUpperBound[cnt];
+                                else if (mapLowerBound[cnt] == 0)   // c{0,3}
+                                    mapFinalGuards[i] = "c" + cnt + "[" + (st.Item2 - 1) + "]<=" + mapUpperBound[cnt];
+                                else   // c{2,3}
+                                    mapFinalGuards[i] = mapLowerBound[cnt] + "<=c" + cnt + "[" + (st.Item2 - 1) + "]<=" + mapUpperBound[cnt];
+                            }
+                        }
+
+                    }
+                }
+            }
+
+            //using (System.IO.StreamWriter file =
+            //new System.IO.StreamWriter(@"C:\Users\lenka\view_refinement\Margus\automata-25-01-2019\output.txt"))
+            //{
+            //    file.WriteLine("Macros");
+            //    foreach (var item in mapMacros)
+            //    {
+            //        file.WriteLine("{0}:", item.Key);
+            //        foreach (var s in item.Value)
+            //            file.WriteLine(s);
+
+            //    }
+            //    file.WriteLine("Edges");
+            //    foreach (var item in updates)
+            //    {
+            //        file.WriteLine("{0}: {1}", item.Key, item.Value);
+            //    }
+            //}
+            var labels = mapMacros.ToDictionary(k => k.Key, k => ConvertToString(k.Value));
+            var guards = mapFinalGuards;
+            AutomatonCA<T> detCA = AutomatonCA<T>.Create(solver, initialState, finalStateList, EnumerateMoves(delta), delta.Keys.ToList(), labels, updates, mapFinalGuards);
+            return detCA;
+        }
 
         public Automaton<T> Determinize(int timeout = 0)
         {
