@@ -2567,7 +2567,7 @@ namespace Microsoft.Automata
         /**
          * Get symbol from a label
          * */
-        private Int64 GetSymbol(T cond)
+        private int GetSymbol(T cond)
         {
             string pattern;
             pattern = @"\((\d*), \[[^\]]*\]\)";
@@ -2576,7 +2576,7 @@ namespace Microsoft.Automata
             Match match = rgx.Match(label);
             GroupCollection data = match.Groups;
             if (match.Success)
-                return Int64.Parse(data[1].ToString());
+                return int.Parse(data[1].ToString());
             else
                 return -1;
         }
@@ -2760,23 +2760,23 @@ namespace Microsoft.Automata
         /**
          * Generate a set of minterms
          **/
-        private List<Int64> GenMinterms(List<Int64> sym_guards)
+        private List<int> GenMinterms(List<int> sym_guards)
         {
-            List<Int64> list = sym_guards.Distinct().ToList();
+            List<int> list = sym_guards.Distinct().ToList();
             return list;
         }
 
         /**
         * Return symbolic guards of the edges
         **/
-        private List<Int64> GetSymbolicGuards(List<Move<T>> out_trans)
+        private List<int> GetSymbolicGuards(List<Move<T>> out_trans)
         {
             T[] conds;
-            List<Int64> sym_grds = new List<Int64>();
+            List<int> sym_grds = new List<int>();
             conds = Array.ConvertAll(out_trans.ToArray(), move => { return move.Label; });
             foreach (var cond in conds)
             {
-                Int64 symbol = this.GetSymbol(cond);
+                int symbol = this.GetSymbol(cond);
                 if (symbol != -1)
                 {
                     sym_grds.Add(symbol);
@@ -3099,9 +3099,9 @@ namespace Microsoft.Automata
                 }
 
                 // get symbolic guards of the moves
-                List<Int64> sym_grds = this.GetSymbolicGuards(out_trans);
+                List<int> sym_grds = this.GetSymbolicGuards(out_trans);
                 // make outgoing symbol guards disjoint
-                List<Int64> symb_guard_minterms = this.GenMinterms(sym_grds);
+                List<int> symb_guard_minterms = this.GenMinterms(sym_grds);
 
                 // var conds = Array.ConvertAll(out_trans.ToArray(), move => { return move.Label; });
                 // var min =  solver.GenerateMinterms(conds);
