@@ -1603,9 +1603,9 @@ namespace Microsoft.Automata
         /// <param name="B">another automaton</param>
         public bool IsEquivalentWith(Automaton<T> B)
         {
-            CheckIdentityOfAlgebras(algebra, B.algebra);      
-      
-            if(this.isDeterministic && B.isDeterministic)
+            CheckIdentityOfAlgebras(algebra, B.algebra);
+
+            if (this.isDeterministic && B.isDeterministic)
                 return areHKEquivalentDeterministic(this.MakeTotal(), B.MakeTotal()).Item1;
 
             return areHKEquivalent(this.RemoveEpsilons().MakeTotal(), B.RemoveEpsilons().MakeTotal()).Item1;
@@ -1680,7 +1680,7 @@ namespace Microsoft.Automata
 
 
                 foreach (var minterm1 in minterms1)
-                {                    
+                {
                     foreach (var minterm2 in minterms2)
                     {
                         var conj = aut1.algebra.MkAnd(minterm1.Item2, minterm2.Item2);
@@ -1696,7 +1696,7 @@ namespace Microsoft.Automata
                             for (int i = 0; i < minterm2.Item1.Length; i++)
                                 if (minterm2.Item1[i])
                                     to2.Add(movesFromCurr2[i].TargetState);
-                                
+
                             var to2st = dfaStateBuilderForAut2.MakePowerSetState(to2);
 
 
@@ -2478,7 +2478,7 @@ namespace Microsoft.Automata
                         witnessTree[move.TargetState] = move;
                     }
                 }
-                state = stack.Pop();      
+                state = stack.Pop();
             }
 
             ConsList<Move<T>> path = null;
@@ -2505,7 +2505,7 @@ namespace Microsoft.Automata
 
         public Automaton<T> DeterminizeOld(int timeout = 0)
         {
-            IBooleanAlgebra<T> solver = algebra;       
+            IBooleanAlgebra<T> solver = algebra;
 
             if (IsDeterministic)
                 return this;
@@ -2603,7 +2603,7 @@ namespace Microsoft.Automata
         private int GetCounterNumber(string label)
         {
             string pattern;
-            pattern = @"c([0-9])*[<=]+[0-9]*";  // c0<k | c0==k
+            pattern = @"c([0-9]*)[<=]+[0-9]*";  // c0<k | c0==k
             Regex rgx = new Regex(pattern);
             Match match = rgx.Match(label);
             GroupCollection data = match.Groups;
@@ -3121,6 +3121,11 @@ namespace Microsoft.Automata
                             {
 
                                 var counter = mapCounter[tr.SourceState];
+                                // wrong format of input automata
+                                if (!mapUpperBound.ContainsKey(counter))
+                                {
+                                    throw new InvalidOperationException();
+                                }
                                 used_cnts[counter] = mapUpperBound[counter];
                             }
                         }
@@ -3475,7 +3480,7 @@ namespace Microsoft.Automata
                 return this;
 
             Automaton<T>[] disjuncts;
-            if (TryDecompose(out disjuncts))  
+            if (TryDecompose(out disjuncts))
             {
                 var disjuncts_det = Array.ConvertAll(disjuncts, d => d.Determinize().Minimize());
                 var disjuncts_comp = Array.ConvertAll(disjuncts_det, d => d.Complement().Minimize());
@@ -3883,11 +3888,11 @@ namespace Microsoft.Automata
         /// </summary>
         public Automaton<T> NonDetGetMinAut(int which)
         {
-            if (which==1)
+            if (which == 1)
                 return MinSFA(this);
             if (which == 2)
                 return MinSFANew(this);
-            if (which==3)
+            if (which == 3)
                 return MinSFACount(this);
             throw new AutomataException("which is different than 1,2,3 ");
         }
@@ -3968,11 +3973,11 @@ namespace Microsoft.Automata
 
             //Computes and memoizes BlockPre
             Func<Block, Dictionary<int, T>> GetBlockPre = (B) =>
-            {                
+            {
                 if (BlockPre.ContainsKey(B))
                     return BlockPre[B];
                 else
-                {                    
+                {
                     var dicB = new Dictionary<int, T>();
                     foreach (var q in B)
                     {
@@ -4044,15 +4049,15 @@ namespace Microsoft.Automata
             };
             #endregion
 
-                     
+
             while (!W.IsEmpty)
             {
                 CheckTimeout(timeoutLimit);
                 totalExploredBlocks++;
-             
+
                 var B = W.Pop();
 
-                var Gamma = GetBlockPre(B);                
+                var Gamma = GetBlockPre(B);
 
                 #region apply initial splitting without using guards
                 var relevant = new HashSet<Block>();
@@ -4069,13 +4074,13 @@ namespace Microsoft.Automata
                     foreach (var p in P)
                         if (KeySet.Contains(p))
                             P1.Add(p);
-                        else                        
-                            P2.Add(p);                     
+                        else
+                            P2.Add(p);
 
                     //If it was there put both halves otherwise only one half
                     if (P1.Count > 0 && P2.Count > 0)
                         UpdateBlocks(P, P1, P2);
-                                        
+
                 }
                 #endregion
 
@@ -4088,12 +4093,12 @@ namespace Microsoft.Automata
 
                 var relevantList = new List<Block>(relevant2);
                 var gammaHatList = new List<Block>();
-                                               
-                Dictionary<int, T> GammaHat = null;                
+
+                Dictionary<int, T> GammaHat = null;
 
                 //only relevant blocks are potentially split               
                 while (relevantList.Count > 0)
-                {                    
+                {
                     //this loop splits using gamma, if a block that is processed is not split, we feed it to gamma hat
                     while (relevantList.Count > 0)
                     {
@@ -4109,10 +4114,10 @@ namespace Microsoft.Automata
                         int p = PE.Current;
                         P1.Add(p);
 
-                        bool splitFound = false;                        
+                        bool splitFound = false;
                         var psi = Gamma[p];
 
-                        var witness = solver.False;                        
+                        var witness = solver.False;
 
                         #region compute P1 and P2 as subblocks
                         while (PE.MoveNext())
@@ -4172,17 +4177,17 @@ namespace Microsoft.Automata
                             //New created blocks have to be investigated
                             // Investigate new blocks
                             if (P1.Count > 1)
-                                relevantList.Add(P1);                                
+                                relevantList.Add(P1);
                             if (P2.Count > 1)
                                 relevantList.Add(P2);
-                            
+
                             UpdateBlocks(P, P1, P2);
                         }
-                        
+
                         #endregion
                     }
 
-                    
+
                     #region GammaHatSplit
                     //do splitting with respect to GammaHat                               
                     while (gammaHatList.Count > 0)
@@ -4229,7 +4234,7 @@ namespace Microsoft.Automata
                             {
                                 var inters = solver.MkAnd(witness, phi_and_phihat);
                                 if (solver.IsSatisfiable(inters))
-                                    P1.Add(q);                               
+                                    P1.Add(q);
                                 else
                                     P2.Add(q);
                             }
@@ -4277,8 +4282,8 @@ namespace Microsoft.Automata
                             UpdateBlocks(P, P1, P2);
                         }
                         #endregion
-                    } 
-                    #endregion                    
+                    }
+                    #endregion
                 }
             }
 
@@ -4289,7 +4294,7 @@ namespace Microsoft.Automata
             return autom.JoinStates(GetRepresentative, solver.MkOr);
         }
 
-        
+
         /// <summary>
         /// NFA minimization algorithm based on counting
         /// </summary>
@@ -4395,7 +4400,7 @@ namespace Microsoft.Automata
 
             Func<T, T, T> MkDiff = (x, y) => solver.MkAnd(x, solver.MkNot(y));
             Func<IteBag<T>, bool> IsSat = (b) => b.IntersectsWith(iteBuilder.MkSingleton(solver.True));
-            
+
 
             while (!W.IsEmpty)
             {
@@ -4772,7 +4777,7 @@ namespace Microsoft.Automata
             else
                 W.Push(finalBlock);
 
-            Func<T, T, T> MkDiff = (x, y) => solver.MkAnd(x, solver.MkNot(y));            
+            Func<T, T, T> MkDiff = (x, y) => solver.MkAnd(x, solver.MkNot(y));
             int totalPre = 0;
             while (!W.IsEmpty)
             {
@@ -4834,7 +4839,7 @@ namespace Microsoft.Automata
                 var relevantList = new List<Block>(relevant2);
 
                 //only relevant blocks are potentially split               
-                while (relevantList.Count>0)
+                while (relevantList.Count > 0)
                 {
                     var P = relevantList[0];
                     relevantList.RemoveAt(0);
@@ -6298,7 +6303,7 @@ namespace Microsoft.Automata
         /// </summary>
         /// <param name="q0">the id of the initial state default is 0</param>
         /// <returns></returns>
-        public Automaton<T> Normalize(int q0 = 0) 
+        public Automaton<T> Normalize(int q0 = 0)
         {
             IBooleanAlgebra<T> solver = this.algebra;
             if (!this.isEpsilonFree)
@@ -6384,7 +6389,7 @@ namespace Microsoft.Automata
             return Automaton.IsMatch(input.Substring(0));
         }
 
-        public Tuple<int, int>[] Matches(string input, int start=0, int limit = 0)
+        public Tuple<int, int>[] Matches(string input, int start = 0, int limit = 0)
         {
             throw new NotImplementedException();
         }
@@ -6544,7 +6549,7 @@ namespace Microsoft.Automata
                 {
                     set.Remove(b);
                     return b;
-                }                
+                }
             }
         }
 

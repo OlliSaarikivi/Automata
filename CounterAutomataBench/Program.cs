@@ -261,7 +261,7 @@ namespace CounterAutomataBench
                                 dfaSize.Add(dfa.StateCount);
 
                                 sw.Restart();
-                                var min = dfa.Minimize(TIMEOUT);
+                                var min = dfa.Minimize();
                                 dfaToMin.Add(sw.Elapsed.TotalMilliseconds);
                                 minSize.Add(min.StateCount);
                             }
